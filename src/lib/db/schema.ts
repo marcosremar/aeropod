@@ -65,6 +65,18 @@ export const projects = pgTable("projects", {
   // Topic segmentation data
   topics: jsonb("topics"), // Detected topics/chapters
   topicsSummary: text("topics_summary"), // Overall content summary
+  // Video cut editor fields (additive; audio flows unaffected)
+  mediaType: varchar("media_type", { length: 20 }).default("audio"), // 'audio' | 'video'
+  sourceType: varchar("source_type", { length: 20 }), // 'upload' | 'youtube'
+  sourceUrl: text("source_url"), // original YouTube URL (null for uploads)
+  videoUrl: text("video_url"), // storage URL/path of the downloaded/uploaded source video
+  thumbnailUrl: text("thumbnail_url"), // poster/cover image path
+  aspectRatio: varchar("aspect_ratio", { length: 10 }).default("16:9"), // '16:9' | '9:16' | '1:1'
+  videoDuration: real("video_duration"), // source video duration in seconds (from ffprobe)
+  cutRanges: jsonb("cut_ranges"), // VideoCutRange[] - ranges to KEEP, in output order
+  videoStatus: varchar("video_status", { length: 30 }), // 'importing' | 'imported' | 'rendering' | 'rendered' | 'error'
+  videoError: text("video_error"), // error message for failed import/render
+  exportedVideoUrl: text("exported_video_url"), // path to the final rendered MP4
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -485,6 +497,17 @@ export interface SocialClipMetadata {
   hookText?: string; // First few words as hook
   emotionalTone?: string; // funny, inspiring, educational, etc
   targetPlatform?: "tiktok" | "reels" | "shorts" | "all";
+}
+
+// Video aspect ratio for the cut editor export target
+export type AspectRatio = "16:9" | "9:16" | "1:1";
+
+// Video cut range (stored in projects.cutRanges) - a range to KEEP, in output order
+export interface VideoCutRange {
+  id: string;
+  start: number; // seconds
+  end: number; // seconds
+  order: number; // output order
 }
 
 // Filler word patterns by language

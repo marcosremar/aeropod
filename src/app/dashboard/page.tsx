@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner"
 import { ProjectCard } from "@/components/dashboard/ProjectCard"
 import { UploadModal } from "@/components/dashboard/UploadModal"
+import { VideoEntryButtons } from "@/components/video/VideoEntryButtons"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -234,13 +235,17 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <Button
-              onClick={handleOpenModal}
-              className="bg-emerald-500 hover:bg-emerald-400 text-black font-medium gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Novo Projeto
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Video cut editor entry points (YouTube import + phone video) */}
+              <VideoEntryButtons />
+              <Button
+                onClick={handleOpenModal}
+                className="bg-emerald-500 hover:bg-emerald-400 text-black font-medium gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Novo Projeto
+              </Button>
+            </div>
           </div>
         </div>
       </header>

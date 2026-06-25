@@ -57,6 +57,13 @@
       "when": 1782419188162,
       "tag": "0007_modern_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782420659099,
+      "tag": "0008_supreme_ink",
+      "breakpoints": true
     }
   ]
 }

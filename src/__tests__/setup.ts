@@ -2,6 +2,43 @@ import "@testing-library/jest-dom";
 import { vi } from "vitest";
 import React from "react";
 
+// --- jsdom polyfills for Radix UI / browser APIs not implemented by jsdom ---
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+globalThis.ResizeObserver = globalThis.ResizeObserver || (ResizeObserverMock as unknown as typeof ResizeObserver);
+
+if (!globalThis.matchMedia) {
+  globalThis.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
+}
+
+// jsdom doesn't implement these on HTMLMediaElement / Element
+if (typeof window !== "undefined") {
+  window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
+  window.HTMLMediaElement.prototype.pause = vi.fn();
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  if (!window.HTMLElement.prototype.hasPointerCapture) {
+    window.HTMLElement.prototype.hasPointerCapture = vi.fn();
+  }
+  if (!window.HTMLElement.prototype.releasePointerCapture) {
+    window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+  }
+  if (!window.HTMLElement.prototype.setPointerCapture) {
+    window.HTMLElement.prototype.setPointerCapture = vi.fn();
+  }
+}
+
 // Mock framer-motion to avoid animation issues in tests
 vi.mock("framer-motion", () => {
   const createMockComponent = (tag: string) => {
