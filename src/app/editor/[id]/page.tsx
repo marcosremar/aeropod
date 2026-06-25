@@ -12,6 +12,7 @@ import { ExportButton } from "@/components/editor/ExportButton";
 import { FillerWordPanel } from "@/components/editor/FillerWordPanel";
 import { AudioEnhancementPanel } from "@/components/editor/AudioEnhancementPanel";
 import { ShowNotesPanel } from "@/components/editor/ShowNotesPanel";
+import { SocialClipsGenerator } from "@/components/editor/SocialClipsGenerator";
 import { SegmentSearch } from "@/components/editor/SegmentSearch";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,10 +39,11 @@ import {
   Volume2,
   Mic,
   Settings,
+  Scissors,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type SidebarPanel = "chat" | "fillers" | "enhance" | "notes";
+type SidebarPanel = "chat" | "fillers" | "enhance" | "notes" | "clips";
 
 interface EditorPageProps {
   params: Promise<{ id: string }>;
@@ -739,7 +741,7 @@ export default function EditorPage({ params }: EditorPageProps) {
                   }
                 }}
                 onUpdateSegment={handleUpdateSegment}
-                projectTitle={project.title}
+                projectTitle={project.title || undefined}
                 originalDuration={project.originalDuration || 0}
                 className="h-full"
               />
@@ -798,6 +800,18 @@ export default function EditorPage({ params }: EditorPageProps) {
               <FileText className="h-3.5 w-3.5" />
               Notes
             </button>
+            <button
+              onClick={() => setActivePanel("clips")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors whitespace-nowrap cursor-pointer",
+                activePanel === "clips"
+                  ? "text-pink-400 border-b-2 border-pink-400"
+                  : "text-zinc-500 hover:text-zinc-300"
+              )}
+            >
+              <Scissors className="h-3.5 w-3.5" />
+              Clips
+            </button>
           </div>
 
           {/* Panel Content */}
@@ -822,6 +836,14 @@ export default function EditorPage({ params }: EditorPageProps) {
               <ShowNotesPanel
                 projectId={project.id}
                 onSeekTo={handleSeekTo}
+                className="h-full"
+              />
+            )}
+
+            {activePanel === "clips" && (
+              <SocialClipsGenerator
+                projectId={project.id}
+                onPlaySegment={handleSeekTo}
                 className="h-full"
               />
             )}

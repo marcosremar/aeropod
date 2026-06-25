@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { spawn } from "child_process";
 import path from "path";
 import os from "os";
+import { assertFFmpeg } from "@/lib/audio/ffmpeg-utils";
 
 export interface ClipSuggestion {
   segmentIds: string[];
@@ -322,7 +323,7 @@ export class SocialClipService {
       generatedDescription: suggestion.description,
       suggestedHashtags: this.generateHashtags(suggestion),
       hookText: suggestion.hookText,
-      emotionalTone: "educational", // TODO: Detect from content
+      emotionalTone: this.detectEmotionalTone(suggestion),
       targetPlatform: "all",
     };
 
@@ -367,6 +368,37 @@ export class SocialClipService {
   }
 
   /**
+   * Detect the emotional tone of a clip from its content and scores.
+   * Returns one of: funny, inspiring, controversial, educational.
+   */
+  private detectEmotionalTone(suggestion: ClipSuggestion): string {
+    const text = `${suggestion.title} ${suggestion.description} ${suggestion.hookText} ${suggestion.reason}`.toLowerCase();
+
+    const matches = (words: string[]) => words.some((w) => text.includes(w));
+
+    // Funny / entertaining
+    if (matches(["engraçad", "piada", "risada", "humor", "hilári", "comédia", "kkk", "rir"])) {
+      return "funny";
+    }
+
+    // Controversial / debate
+    if (matches(["polêmic", "controvers", "discord", "debate", "contra", "errado", "polemic"])) {
+      return "controversial";
+    }
+
+    // Inspiring / motivational — also implied by very high viral/hook potential
+    if (
+      matches(["inspir", "motiva", "superaç", "sonho", "transform", "lição", "história de"]) ||
+      (suggestion.viralPotential >= 8 && suggestion.hookScore >= 8)
+    ) {
+      return "inspiring";
+    }
+
+    // Default: educational/informative content
+    return "educational";
+  }
+
+  /**
    * Export clip to video file with captions
    */
   async exportClip(
@@ -385,6 +417,9 @@ export class SocialClipService {
     }
 
     try {
+      // FFmpeg is required to render the video clip — fail clearly if missing.
+      await assertFFmpeg("Social clip export");
+
       // Get word timestamps for captions
       let wordTimestamps: WordTimestamp[] = [];
       if (options.addCaptions) {

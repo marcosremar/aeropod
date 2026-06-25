@@ -195,9 +195,21 @@ export function createStorageClient(useMock = false): StorageClient {
     region: process.env.S3_REGION,
   };
 
-  // Validate required config
-  if (!config.accessKey || !config.secretKey || !config.bucket) {
-    throw new Error('Missing required S3 configuration: S3_ACCESS_KEY, S3_SECRET_KEY, S3_BUCKET');
+  const isConfigured = config.accessKey && config.secretKey && config.bucket;
+
+  if (!isConfigured) {
+    // In production, missing storage config is a fatal misconfiguration.
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'Missing required S3 configuration: S3_ACCESS_KEY, S3_SECRET_KEY, S3_BUCKET'
+      );
+    }
+    // In development/test, degrade gracefully to in-memory mock storage.
+    console.warn(
+      '[Storage] S3 not configured (S3_ACCESS_KEY/S3_SECRET_KEY/S3_BUCKET). ' +
+        'Using in-memory mock storage. Set these env vars for real uploads.'
+    );
+    return new MockStorageClient();
   }
 
   return new S3StorageClient(config);

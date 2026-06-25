@@ -10,6 +10,7 @@ import { promisify } from "util";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { isFFmpegAvailable, isFFprobeAvailable, FFmpegNotAvailableError } from "./ffmpeg-utils";
 
 const execAsync = promisify(exec);
 
@@ -43,6 +44,17 @@ export async function extractWaveformPeaks(
   duration?: number
 ): Promise<WaveformData> {
   console.log(`[Waveform] Extracting peaks from: ${audioPath}`);
+
+  // Waveform extraction relies on ffmpeg + ffprobe. Bail out early with a clear
+  // error (the caller treats this as non-critical) instead of failing deep in
+  // an exec() call with a cryptic "command not found".
+  const [hasFFmpeg, hasFFprobe] = await Promise.all([
+    isFFmpegAvailable(),
+    isFFprobeAvailable(),
+  ]);
+  if (!hasFFmpeg || !hasFFprobe) {
+    throw new FFmpegNotAvailableError("Waveform extraction");
+  }
 
   // Resolve the audio path
   let resolvedPath = audioPath;

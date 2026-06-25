@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, projects, segments } from "@/lib/db";
 import { eq, and, asc } from "drizzle-orm";
 import { TextCut } from "@/lib/db/schema";
+import { isFFmpegAvailable, FFmpegNotAvailableError } from "@/lib/audio/ffmpeg-utils";
 
 /**
  * POST /api/export/[id]
@@ -90,6 +91,12 @@ export async function POST(
     });
   } catch (error) {
     console.error("Export error:", error);
+    if (error instanceof FFmpegNotAvailableError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: "Failed to export audio" },
       { status: 500 }
@@ -181,41 +188,28 @@ async function generateEditedAudio(
   );
   console.log(`[Export] Total text-based cuts to apply: ${totalCuts}`);
 
-  // Check if FFmpeg is available
-  const ffmpegAvailable = await checkFFmpegAvailable();
+  // Check if FFmpeg is actually installed (the binary, not just the JS wrapper).
+  const ffmpegAvailable = await isFFmpegAvailable();
+
+  // Allow an explicit opt-in to mock exports for local development/testing only.
+  const allowMock = process.env.ALLOW_MOCK_EXPORT === "true";
 
   if (!ffmpegAvailable) {
-    console.warn(
-      "[Export] FFmpeg not available, using mock export. Install FFmpeg for production."
-    );
-    return generateMockExport(originalAudioUrl, selectedSegments);
+    if (allowMock) {
+      console.warn(
+        "[Export] FFmpeg not available, using mock export (ALLOW_MOCK_EXPORT=true)."
+      );
+      return generateMockExport(originalAudioUrl, selectedSegments);
+    }
+    // Fail loudly instead of returning a fake download URL.
+    throw new FFmpegNotAvailableError("Audio export");
   }
 
-  // In production, use FFmpeg to:
+  // Use FFmpeg to:
   // 1. Extract each segment from the original audio
   // 2. Concatenate segments in order
-  // 3. Upload the result to S3
-  // 4. Return the download URL
-
-  try {
-    return await generateRealExport(originalAudioUrl, selectedSegments);
-  } catch (error) {
-    console.error("[Export] FFmpeg export failed, falling back to mock:", error);
-    return generateMockExport(originalAudioUrl, selectedSegments);
-  }
-}
-
-/**
- * Check if FFmpeg is installed and available
- */
-async function checkFFmpegAvailable(): Promise<boolean> {
-  try {
-    // Try to dynamically import fluent-ffmpeg
-    const ffmpeg = await import("fluent-ffmpeg");
-    return true;
-  } catch (error) {
-    return false;
-  }
+  // 3. Return the download URL
+  return await generateRealExport(originalAudioUrl, selectedSegments);
 }
 
 /**

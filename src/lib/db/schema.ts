@@ -192,6 +192,7 @@ export const sectionSegments = pgTable("section_segments", {
   order: integer("order").notNull(), // Order within section
   startOffset: real("start_offset"), // Trim start (seconds)
   endOffset: real("end_offset"), // Trim end (seconds)
+  confidence: real("confidence"), // AI mapping confidence (0-1)
   createdAt: timestamp("created_at").defaultNow(),
 });
 

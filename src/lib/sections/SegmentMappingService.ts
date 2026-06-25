@@ -360,6 +360,7 @@ Rules:
           sectionId,
           segmentId: sectionMappings[i].segmentId,
           order: i,
+          confidence: sectionMappings[i].confidence,
         });
       }
 
@@ -425,7 +426,7 @@ Rules:
         segmentId: m.segment.id,
         sectionId: m.sectionSegment.sectionId,
         templateSectionId: sectionWithTemplate?.templateSection.id || "",
-        confidence: m.segment.sectionMatchScore || 0.5,
+        confidence: m.sectionSegment.confidence ?? m.segment.sectionMatchScore ?? 0.5,
         reasoning: "Mapeamento existente",
       };
     });

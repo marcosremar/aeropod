@@ -54,9 +54,9 @@ export function RerecordModal({
 
     if (segment.errorType === "factual_error" && analysis?.factualErrorDetail) {
       return {
-        type: "Factual Error",
+        type: "Erro Factual",
         detail: analysis.factualErrorDetail,
-        suggestion: analysis.rerecordSuggestion || "Correct the factual error and re-record this segment.",
+        suggestion: analysis.rerecordSuggestion || "Corrija o erro factual e regrave este segmento.",
       };
     }
 
@@ -65,32 +65,32 @@ export function RerecordModal({
       analysis?.contradictionDetail
     ) {
       return {
-        type: "Contradiction",
+        type: "Contradição",
         detail: analysis.contradictionDetail,
-        suggestion: analysis.rerecordSuggestion || "Resolve the contradiction and re-record this segment.",
+        suggestion: analysis.rerecordSuggestion || "Resolva a contradição e regrave este segmento.",
       };
     }
 
     if (segment.errorType === "confusing" && analysis?.confusingDetail) {
       return {
-        type: "Confusing",
+        type: "Confuso",
         detail: analysis.confusingDetail,
-        suggestion: analysis.rerecordSuggestion || "Clarify the content and re-record this segment.",
+        suggestion: analysis.rerecordSuggestion || "Esclareça o conteúdo e regrave este segmento.",
       };
     }
 
     if (segment.errorType === "incomplete" && analysis?.incompleteDetail) {
       return {
-        type: "Incomplete",
+        type: "Incompleto",
         detail: analysis.incompleteDetail,
-        suggestion: analysis.rerecordSuggestion || "Complete the thought and re-record this segment.",
+        suggestion: analysis.rerecordSuggestion || "Complete o raciocínio e regrave este segmento.",
       };
     }
 
     return {
-      type: "Needs Re-record",
-      detail: segment.errorDetail || "This segment needs to be re-recorded.",
-      suggestion: analysis?.rerecordSuggestion || "Please re-record this segment with the suggested improvements.",
+      type: "Precisa Regravar",
+      detail: segment.errorDetail || "Este segmento precisa ser regravado.",
+      suggestion: analysis?.rerecordSuggestion || "Regrave este segmento com as melhorias sugeridas.",
     };
   };
 
@@ -218,7 +218,7 @@ export function RerecordModal({
       drawWaveform();
     } catch (error) {
       console.error("Error starting recording:", error);
-      alert("Failed to access microphone. Please grant permission and try again.");
+      alert("Não foi possível acessar o microfone. Conceda a permissão e tente novamente.");
     }
   };
 
@@ -275,7 +275,7 @@ export function RerecordModal({
       handleClose();
     } catch (error) {
       console.error("Error confirming re-record:", error);
-      alert("Failed to save recording. Please try again.");
+      alert("Não foi possível salvar a gravação. Tente novamente.");
     } finally {
       setIsSubmitting(false);
     }
@@ -317,17 +317,17 @@ export function RerecordModal({
         {/* Header */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Re-record Segment
+            Regravar Segmento
           </h2>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
-            Record a new version of this segment to fix the issue
+            Grave uma nova versão deste segmento para corrigir o problema
           </p>
         </div>
 
         {/* Original text */}
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            Original Text
+            Texto Original
           </h3>
           <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
             <p className="text-sm text-gray-900 dark:text-gray-100">
@@ -346,10 +346,10 @@ export function RerecordModal({
                   <Badge variant="destructive">{errorInfo.type}</Badge>
                 </div>
                 <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
-                  <strong>Issue:</strong> {errorInfo.detail}
+                  <strong>Problema:</strong> {errorInfo.detail}
                 </p>
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  <strong>Suggestion:</strong> {errorInfo.suggestion}
+                  <strong>Sugestão:</strong> {errorInfo.suggestion}
                 </p>
               </div>
             </div>
@@ -359,7 +359,7 @@ export function RerecordModal({
         {/* Recording area */}
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-            Record New Audio
+            Gravar Novo Áudio
           </h3>
 
           {/* Waveform visualization */}
@@ -381,7 +381,7 @@ export function RerecordModal({
               <div className="flex items-center justify-center gap-2 mt-2">
                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Recording...
+                  Gravando...
                 </span>
               </div>
             )}
@@ -395,7 +395,7 @@ export function RerecordModal({
                 className="flex items-center gap-2"
               >
                 <Mic className="w-4 h-4" />
-                Start Recording
+                Iniciar Gravação
               </Button>
             )}
 
@@ -406,7 +406,7 @@ export function RerecordModal({
                 className="flex items-center gap-2"
               >
                 <Square className="w-4 h-4" />
-                Stop Recording
+                Parar Gravação
               </Button>
             )}
 
@@ -436,7 +436,7 @@ export function RerecordModal({
                   className="flex items-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  Record Again
+                  Gravar Novamente
                 </Button>
               </>
             )}
@@ -456,7 +456,7 @@ export function RerecordModal({
         {/* Action buttons */}
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
-            Cancel
+            Cancelar
           </Button>
           <Button
             onClick={handleConfirm}
@@ -464,11 +464,11 @@ export function RerecordModal({
             className="flex items-center gap-2"
           >
             {isSubmitting ? (
-              "Saving..."
+              "Salvando..."
             ) : (
               <>
                 <Check className="w-4 h-4" />
-                Confirm & Replace
+                Confirmar e Substituir
               </>
             )}
           </Button>

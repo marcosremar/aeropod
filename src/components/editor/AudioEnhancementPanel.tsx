@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Volume2,
@@ -45,6 +45,19 @@ export function AudioEnhancementPanel({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement>(null);
+
+  const togglePreviewPlayback = () => {
+    const audio = previewAudioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      audio.play();
+      setIsPreviewPlaying(true);
+    } else {
+      audio.pause();
+      setIsPreviewPlaying(false);
+    }
+  };
 
   // Default presets
   const defaultPresets: EnhancementPreset[] = [
@@ -464,6 +477,37 @@ export function AudioEnhancementPanel({
 
       {/* Actions */}
       <div className="p-4 border-t border-zinc-800 space-y-2">
+        {/* Preview player */}
+        {previewUrl && (
+          <div className="flex items-center gap-3 rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2">
+            <button
+              onClick={togglePreviewPlayback}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-500 text-white hover:bg-purple-400 transition-colors cursor-pointer"
+              aria-label={isPreviewPlaying ? "Pausar preview" : "Tocar preview"}
+            >
+              {isPreviewPlaying ? (
+                <Pause className="h-4 w-4" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-zinc-200">Preview (10s)</p>
+              <p className="truncate text-[11px] text-zinc-500">
+                Ouça antes de aplicar as melhorias
+              </p>
+            </div>
+            <audio
+              ref={previewAudioRef}
+              src={previewUrl}
+              onEnded={() => setIsPreviewPlaying(false)}
+              onPause={() => setIsPreviewPlaying(false)}
+              onPlay={() => setIsPreviewPlaying(true)}
+              className="hidden"
+            />
+          </div>
+        )}
+
         <div className="flex gap-2">
           <Button
             variant="outline"

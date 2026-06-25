@@ -4,7 +4,7 @@
  * Usa Qwen3 Embedding para gerar embeddings e busca por similaridade de cosseno
  */
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "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";
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const EMBEDDING_MODEL = "qwen/qwen3-embedding-0.6b"; // Modelo leve e eficiente
 const RERANK_MODEL = "qwen/qwen3-embedding-8b"; // Modelo maior para rerank
 
@@ -56,7 +56,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
  * Classe principal de busca semantica
  */
 export class SemanticSearchService {
-  private apiKey: string;
+  private apiKey?: string;
   private embeddingModel: string;
   private rerankModel: string;
   private cache: Map<string, number[]> = new Map();
@@ -72,9 +72,23 @@ export class SemanticSearchService {
   }
 
   /**
+   * Whether the service has an API key configured. Callers can use this to
+   * decide whether to fall back to keyword search.
+   */
+  isConfigured(): boolean {
+    return Boolean(this.apiKey);
+  }
+
+  /**
    * Gera embedding para um texto
    */
   async generateEmbedding(text: string): Promise<number[]> {
+    if (!this.apiKey) {
+      throw new Error(
+        "OPENROUTER_API_KEY is not set. Semantic search is unavailable; falling back to keyword search."
+      );
+    }
+
     // Check cache first
     const cached = this.cache.get(text);
     if (cached) return cached;
@@ -111,6 +125,12 @@ export class SemanticSearchService {
    * Gera embeddings para multiplos textos em batch
    */
   async generateEmbeddings(texts: string[]): Promise<EmbeddingResult[]> {
+    if (!this.apiKey) {
+      throw new Error(
+        "OPENROUTER_API_KEY is not set. Semantic search is unavailable; falling back to keyword search."
+      );
+    }
+
     // Filter out already cached texts
     const uncachedTexts = texts.filter(t => !this.cache.has(t));
 

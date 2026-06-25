@@ -50,9 +50,12 @@ export async function POST(
       );
     }
 
-    // If project already has a template, clean up old data
-    if (project.currentTemplateId) {
-      // Get old project sections
+    // Always clean up any existing template data for this project before
+    // applying the (possibly same) template again. This prevents duplicate
+    // sections from being created when a template is re-applied — even if
+    // currentTemplateId was never set (e.g. partial previous runs).
+    {
+      // Get existing project sections
       const oldSections = await db
         .select()
         .from(projectSections)

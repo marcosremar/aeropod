@@ -1,0 +1,1 @@
+ALTER TABLE "section_segments" ADD COLUMN "confidence" real;

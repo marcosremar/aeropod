@@ -20,10 +20,10 @@ export async function GET(request: NextRequest) {
   // Criar resposta com redirect
   const response = NextResponse.redirect(new URL(redirectTo, request.url));
 
-  // Setar cookie de sessao
+  // Setar cookie de sessao (httpOnly para evitar acesso via JavaScript/XSS)
   response.cookies.set("aeropod_session", JSON.stringify(demoUser), {
     path: "/",
-    httpOnly: false,
+    httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     maxAge: 24 * 60 * 60, // 24 horas em segundos

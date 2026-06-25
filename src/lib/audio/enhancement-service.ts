@@ -8,6 +8,7 @@ import { spawn } from "child_process";
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
+import { assertFFmpeg } from "@/lib/audio/ffmpeg-utils";
 
 export interface EnhancementOptions extends EnhancementSettings {
   inputPath: string;
@@ -46,6 +47,7 @@ export class AudioEnhancementService {
     const outputPath = options.outputPath || this.generateOutputPath(options.inputPath);
 
     try {
+      await assertFFmpeg("Audio enhancement", this.ffmpegPath);
       await this.runFFmpeg(options.inputPath, outputPath, filters);
 
       return {
@@ -75,6 +77,7 @@ export class AudioEnhancementService {
     const previewPath = path.join(os.tmpdir(), `preview-${Date.now()}.mp3`);
 
     try {
+      await assertFFmpeg("Audio enhancement preview", this.ffmpegPath);
       // Add time limiting to filters
       const previewFilters = [`atrim=start=${startTime}:duration=${duration}`, ...filters];
 

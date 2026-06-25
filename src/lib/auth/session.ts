@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 const SESSION_COOKIE_NAME = "aeropod_session";
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
@@ -102,11 +103,17 @@ export async function getOrCreateUser(email: string, name?: string) {
     return existingUser;
   }
 
-  // Create new user
+  // Create new user. `password` is NOT NULL in the schema, so we must set one.
+  // For passwordless auto-login flows we store a random, unusable hash; the user
+  // can later set a real password via a reset flow.
+  const randomPassword = generateSessionId();
+  const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
   const [newUser] = await db
     .insert(users)
     .values({
       email,
+      password: hashedPassword,
       name: name || email.split("@")[0],
       plan: "free",
     })

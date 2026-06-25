@@ -82,7 +82,7 @@ async function getTemplateData(projectId: string) {
         (ps) => ps.templateSectionId === section.id
       );
 
-      const currentDuration = projectSection?.totalDuration || 0;
+      const currentDuration = projectSection?.duration || 0;
       const targetDuration = section.suggestedDuration || section.minDuration || 60;
 
       let status: "empty" | "partial" | "complete" = "empty";
