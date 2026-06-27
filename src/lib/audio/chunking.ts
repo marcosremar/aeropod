@@ -242,16 +242,18 @@ export function splitChunkAtTime(
 export function validateChunks(chunks: AudioChunk[]): boolean {
   if (chunks.length === 0) return true;
 
-  for (let i = 0; i < chunks.length - 1; i++) {
+  for (let i = 0; i < chunks.length; i++) {
     const current = chunks[i];
-    const next = chunks[i + 1];
 
-    // Check that chunk times are valid
+    // Check that every chunk has valid times
     if (current.startTime >= current.endTime) return false;
-    if (next.startTime >= next.endTime) return false;
 
-    // Check that chunks don't overlap
-    if (current.endTime > next.startTime) return false;
+    // Check that consecutive chunks don't overlap
+    if (i < chunks.length - 1) {
+      const next = chunks[i + 1];
+      if (next.startTime >= next.endTime) return false;
+      if (current.endTime > next.startTime) return false;
+    }
   }
 
   return true;

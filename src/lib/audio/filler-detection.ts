@@ -6,7 +6,7 @@
 import { WordTimestamp, FILLER_PATTERNS, FillerWord, NewFillerWord } from "@/lib/db/schema";
 import { db } from "@/lib/db";
 import { fillerWords, segments, projects } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 
 export interface DetectedFiller {
   word: string;
@@ -77,12 +77,22 @@ export function detectFillerWords(
           );
 
           if (matches) {
+            const ctxBefore = wordTimestamps
+              .slice(Math.max(0, i - 2), i)
+              .map((w) => w.word)
+              .join(" ");
+            const ctxAfter = wordTimestamps
+              .slice(i + patternWords.length, i + patternWords.length + 2)
+              .map((w) => w.word)
+              .join(" ");
+
             detectedFillers.push({
               word: pattern,
               startTime: matchWords[0].start,
               endTime: matchWords[matchWords.length - 1].end,
               confidence: 0.9, // Multi-word patterns are usually intentional fillers
               segmentId: "",
+              context: `${ctxBefore} [${pattern}] ${ctxAfter}`.trim(),
             });
           }
         }
@@ -210,7 +220,7 @@ export async function markAllFillersForRemoval(
     .where(
       and(
         eq(fillerWords.projectId, projectId),
-        // Only remove high-confidence fillers
+        gte(fillerWords.confidence, minConfidence)
       )
     )
     .returning();

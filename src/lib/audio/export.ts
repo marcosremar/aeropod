@@ -41,6 +41,41 @@ export interface ExportService {
   extractChunks(inputPath: string, chunks: AudioChunk[], exportOptions?: ExportOptions): Promise<Buffer[]>;
 }
 
+/**
+ * Computes the time ranges to KEEP given a set of percentage-based cuts.
+ * The inverse of the cuts — what's left after removing them.
+ * Handles overlapping cuts and edge cases (cuts at start/end).
+ */
+export function computePartsToKeep(
+  startTime: number,
+  endTime: number,
+  cuts: TextCutRange[]
+): Array<{ start: number; end: number }> {
+  const duration = endTime - startTime;
+  const sortedCuts = [...cuts].sort((a, b) => a.startPercent - b.startPercent);
+  const partsToKeep: { start: number; end: number }[] = [];
+  let lastEnd = 0;
+
+  for (const cut of sortedCuts) {
+    if (cut.startPercent > lastEnd) {
+      partsToKeep.push({
+        start: startTime + lastEnd * duration,
+        end: startTime + cut.startPercent * duration,
+      });
+    }
+    lastEnd = Math.max(lastEnd, cut.endPercent);
+  }
+
+  if (lastEnd < 1) {
+    partsToKeep.push({
+      start: startTime + lastEnd * duration,
+      end: endTime,
+    });
+  }
+
+  return partsToKeep;
+}
+
 export class FFmpegExportService implements ExportService {
   /**
    * Extracts a segment from an audio file, optionally with text cuts removed
@@ -78,33 +113,8 @@ export class FFmpegExportService implements ExportService {
    */
   private async extractSegmentWithCuts(options: SegmentExportOptions): Promise<Buffer> {
     const { inputPath, startTime, endTime, textCuts = [], outputFormat = 'mp3' } = options;
-    const duration = endTime - startTime;
 
-    // Sort cuts by start position
-    const sortedCuts = [...textCuts].sort((a, b) => a.startPercent - b.startPercent);
-
-    // Calculate the parts to KEEP (inverse of cuts)
-    const partsToKeep: { start: number; end: number }[] = [];
-    let lastEnd = 0;
-
-    for (const cut of sortedCuts) {
-      if (cut.startPercent > lastEnd) {
-        // There's a part to keep before this cut
-        partsToKeep.push({
-          start: startTime + (lastEnd * duration),
-          end: startTime + (cut.startPercent * duration)
-        });
-      }
-      lastEnd = cut.endPercent;
-    }
-
-    // Add the final part if there's content after the last cut
-    if (lastEnd < 1) {
-      partsToKeep.push({
-        start: startTime + (lastEnd * duration),
-        end: endTime
-      });
-    }
+    const partsToKeep = computePartsToKeep(startTime, endTime, textCuts);
 
     // If no parts to keep (unlikely), return empty buffer
     if (partsToKeep.length === 0) {
