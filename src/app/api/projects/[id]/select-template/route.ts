@@ -50,31 +50,27 @@ export async function POST(
       );
     }
 
-    // If project already has a template, clean up old data
-    if (project.currentTemplateId) {
-      // Get old project sections
-      const oldSections = await db
-        .select()
-        .from(projectSections)
-        .where(eq(projectSections.projectId, projectId));
+    // Always clean up existing sections before applying a new template.
+    // Guarding on currentTemplateId would leave orphaned rows if a previous
+    // call failed after inserting sections but before updating currentTemplateId.
+    const oldSections = await db
+      .select()
+      .from(projectSections)
+      .where(eq(projectSections.projectId, projectId));
 
-      // Delete old section segments mappings
-      for (const section of oldSections) {
-        await db
-          .delete(sectionSegments)
-          .where(eq(sectionSegments.sectionId, section.id));
-      }
-
-      // Delete old project sections
+    for (const section of oldSections) {
       await db
-        .delete(projectSections)
-        .where(eq(projectSections.projectId, projectId));
-
-      // Delete old project template association
-      await db
-        .delete(projectTemplates)
-        .where(eq(projectTemplates.projectId, projectId));
+        .delete(sectionSegments)
+        .where(eq(sectionSegments.sectionId, section.id));
     }
+
+    await db
+      .delete(projectSections)
+      .where(eq(projectSections.projectId, projectId));
+
+    await db
+      .delete(projectTemplates)
+      .where(eq(projectTemplates.projectId, projectId));
 
     // Create new project_template association
     const [projectTemplate] = await db
