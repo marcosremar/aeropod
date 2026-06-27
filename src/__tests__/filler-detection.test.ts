@@ -60,6 +60,36 @@ describe('detectFillerWords', () => {
       expect(multiWordFiller!.confidence).toBe(0.9);
     });
 
+    it('includes context in multi-word filler result', () => {
+      const words: WordTimestamp[] = [
+        makeWord('before', 0, 0.3),
+        makeWord('quer', 0.3, 0.7),
+        makeWord('dizer', 0.7, 1.1),
+        makeWord('after', 1.1, 1.5),
+      ];
+
+      const result = detectFillerWords(words, 'pt');
+
+      const multiWordFiller = result.find((f) => f.word === 'quer dizer');
+      expect(multiWordFiller).toBeDefined();
+      expect(multiWordFiller!.context).toContain('before');
+      expect(multiWordFiller!.context).toContain('after');
+      expect(multiWordFiller!.context).toContain('[quer dizer]');
+    });
+
+    it('multi-word filler context omits surrounding words when at boundaries', () => {
+      const words: WordTimestamp[] = [
+        makeWord('quer', 0, 0.5),
+        makeWord('dizer', 0.5, 0.9),
+      ];
+
+      const result = detectFillerWords(words, 'pt');
+
+      const multiWordFiller = result.find((f) => f.word === 'quer dizer');
+      expect(multiWordFiller).toBeDefined();
+      expect(multiWordFiller!.context).toBe('[quer dizer]');
+    });
+
     it('is case-insensitive', () => {
       const words: WordTimestamp[] = [
         makeWord('HUM', 0, 0.5),
