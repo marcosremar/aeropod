@@ -345,4 +345,223 @@ describe('SocialClipService', () => {
       expect(score).toBeLessThanOrEqual(10);
     });
   });
+
+  describe('extractHook (private)', () => {
+    const extractHook = (seg: Segment): string =>
+      (service as unknown as { extractHook(s: Segment): string }).extractHook(seg);
+
+    it('returns first 12 words of text joined by spaces', () => {
+      const words = 'one two three four five six seven eight nine ten eleven twelve thirteen'.split(' ');
+      const seg = makeSegment({ startTime: 0, endTime: 60, text: words.join(' ') });
+      expect(extractHook(seg)).toBe(words.slice(0, 12).join(' '));
+    });
+
+    it('returns all words when text has fewer than 12 words', () => {
+      const seg = makeSegment({ startTime: 0, endTime: 30, text: 'short text here' });
+      expect(extractHook(seg)).toBe('short text here');
+    });
+
+    it('returns exactly 12 words for text with exactly 12 words', () => {
+      const text = 'a b c d e f g h i j k l';
+      const seg = makeSegment({ startTime: 0, endTime: 30, text });
+      expect(extractHook(seg)).toBe(text);
+    });
+  });
+
+  describe('generateTitle (private)', () => {
+    const generateTitle = (seg: Segment): string =>
+      (service as unknown as { generateTitle(s: Segment): string }).generateTitle(seg);
+
+    it('uses first sentence of keyInsight when available', () => {
+      const seg = makeSegment({
+        startTime: 0,
+        endTime: 30,
+        text: 'Some text here',
+        keyInsight: 'The key point is clarity. More details follow.',
+      });
+      expect(generateTitle(seg)).toBe('The key point is clarity');
+    });
+
+    it('truncates keyInsight sentence to 50 characters with ellipsis', () => {
+      const longInsight = 'A'.repeat(60) + '. Second sentence';
+      const seg = makeSegment({
+        startTime: 0,
+        endTime: 30,
+        text: 'text',
+        keyInsight: longInsight,
+      });
+      const title = generateTitle(seg);
+      expect(title).toHaveLength(53); // 50 + '...'
+      expect(title.endsWith('...')).toBe(true);
+    });
+
+    it('does not add ellipsis when keyInsight sentence is ≤50 chars', () => {
+      const seg = makeSegment({
+        startTime: 0,
+        endTime: 30,
+        text: 'text',
+        keyInsight: 'Short insight.',
+      });
+      expect(generateTitle(seg)).toBe('Short insight');
+    });
+
+    it('falls back to first 6 words of text + "..." when no keyInsight', () => {
+      const seg = makeSegment({
+        startTime: 0,
+        endTime: 30,
+        text: 'word1 word2 word3 word4 word5 word6 word7 word8',
+        keyInsight: null,
+      });
+      expect(generateTitle(seg)).toBe('word1 word2 word3 word4 word5 word6...');
+    });
+  });
+
+  describe('calculateViralPotential (private)', () => {
+    const viralPotential = (seg: Segment): number =>
+      (service as unknown as {
+        calculateViralPotential(s: Segment): number;
+      }).calculateViralPotential(seg);
+
+    it('returns base score of 5 for segment with no scores or extras', () => {
+      const seg = makeSegment({ startTime: 0, endTime: 30, text: 'plain text' });
+      expect(viralPotential(seg)).toBe(5);
+    });
+
+    it('adds up to 3 for interestScore (floor(score/3), capped at 3)', () => {
+      const seg9 = makeSegment({ startTime: 0, endTime: 30, text: 't', interestScore: 9 });
+      const seg6 = makeSegment({ startTime: 0, endTime: 30, text: 't', interestScore: 6 });
+      const seg3 = makeSegment({ startTime: 0, endTime: 30, text: 't', interestScore: 3 });
+      expect(viralPotential(seg9)).toBe(5 + 3); // floor(9/3) = 3
+      expect(viralPotential(seg6)).toBe(5 + 2); // floor(6/3) = 2
+      expect(viralPotential(seg3)).toBe(5 + 1); // floor(3/3) = 1
+    });
+
+    it('adds up to 2 for clarityScore (floor(score/5), capped at 2)', () => {
+      const seg10 = makeSegment({ startTime: 0, endTime: 30, text: 't', clarityScore: 10 });
+      const seg5 = makeSegment({ startTime: 0, endTime: 30, text: 't', clarityScore: 5 });
+      expect(viralPotential(seg10)).toBe(5 + 2); // floor(10/5) = 2
+      expect(viralPotential(seg5)).toBe(5 + 1); // floor(5/5) = 1
+    });
+
+    it('adds 1 for standalone analysis', () => {
+      const standalone = makeSegment({ startTime: 0, endTime: 30, text: 't', analysis: { standalone: true } as any });
+      const notStandalone = makeSegment({ startTime: 0, endTime: 30, text: 't', analysis: { standalone: false } as any });
+      expect(viralPotential(standalone)).toBe(6);
+      expect(viralPotential(notStandalone)).toBe(5);
+    });
+
+    it('adds 1 for keyInsight longer than 30 characters', () => {
+      const longInsight = makeSegment({ startTime: 0, endTime: 30, text: 't', keyInsight: 'A'.repeat(31) });
+      const shortInsight = makeSegment({ startTime: 0, endTime: 30, text: 't', keyInsight: 'Short' });
+      expect(viralPotential(longInsight)).toBe(6);
+      expect(viralPotential(shortInsight)).toBe(5);
+    });
+
+    it('is capped at 10', () => {
+      const seg = makeSegment({
+        startTime: 0,
+        endTime: 30,
+        text: 't',
+        interestScore: 9,
+        clarityScore: 10,
+        keyInsight: 'A'.repeat(40),
+        analysis: { standalone: true } as any,
+      });
+      expect(viralPotential(seg)).toBe(10);
+    });
+  });
+
+  describe('generateReason (private)', () => {
+    const genReason = (seg: Segment, hookScore: number, vp: number): string =>
+      (service as unknown as {
+        generateReason(s: Segment, hookScore: number, viralPotential: number): string;
+      }).generateReason(seg, hookScore, vp);
+
+    it('returns generic fallback when no criteria are met', () => {
+      const seg = makeSegment({ startTime: 0, endTime: 30, text: 'plain' });
+      expect(genReason(seg, 5, 5)).toBe('Bom candidato para clip social');
+    });
+
+    it('includes "abertura forte" for hookScore >= 8', () => {
+      const seg = makeSegment({ startTime: 0, endTime: 30, text: 'plain' });
+      expect(genReason(seg, 8, 5)).toContain('abertura forte');
+    });
+
+    it('includes "alto potencial viral" for viralPotential >= 8', () => {
+      const seg = makeSegment({ startTime: 0, endTime: 30, text: 'plain' });
+      expect(genReason(seg, 5, 8)).toContain('alto potencial viral');
+    });
+
+    it('includes "conteudo muito interessante" for interestScore >= 8', () => {
+      const seg = makeSegment({ startTime: 0, endTime: 30, text: 'plain', interestScore: 8 });
+      expect(genReason(seg, 5, 5)).toContain('conteudo muito interessante');
+    });
+
+    it('includes "comunicacao clara" for clarityScore >= 8', () => {
+      const seg = makeSegment({ startTime: 0, endTime: 30, text: 'plain', clarityScore: 8 });
+      expect(genReason(seg, 5, 5)).toContain('comunicacao clara');
+    });
+
+    it('includes "insight quotavel" when keyInsight is set', () => {
+      const seg = makeSegment({ startTime: 0, endTime: 30, text: 'plain', keyInsight: 'Great insight' });
+      expect(genReason(seg, 5, 5)).toContain('insight quotavel');
+    });
+
+    it('includes "funciona sozinho" for standalone analysis', () => {
+      const seg = makeSegment({ startTime: 0, endTime: 30, text: 'plain', analysis: { standalone: true } as any });
+      expect(genReason(seg, 5, 5)).toContain('funciona sozinho');
+    });
+
+    it('combines multiple matching criteria with comma separation', () => {
+      const seg = makeSegment({ startTime: 0, endTime: 30, text: 'plain', interestScore: 9, clarityScore: 9 });
+      const reason = genReason(seg, 9, 9);
+      expect(reason).toContain('abertura forte');
+      expect(reason).toContain('alto potencial viral');
+      expect(reason).toContain('conteudo muito interessante');
+      expect(reason).toContain('comunicacao clara');
+      expect(reason.startsWith('Motivo:')).toBe(true);
+    });
+  });
+
+  describe('generateHashtags (private)', () => {
+    const genHashtags = (suggestion: { title: string }): string[] =>
+      (service as unknown as {
+        generateHashtags(s: { title: string }): string[];
+      }).generateHashtags(suggestion as any);
+
+    it('always includes base podcast hashtags', () => {
+      const tags = genHashtags({ title: '' });
+      expect(tags).toContain('#podcast');
+      expect(tags).toContain('#podcasting');
+      expect(tags).toContain('#podcastbrasil');
+    });
+
+    it('adds words from title that are longer than 4 characters', () => {
+      const tags = genHashtags({ title: 'amazing content here' });
+      expect(tags).toContain('#amazing');
+      expect(tags).toContain('#content');
+    });
+
+    it('skips title words with 4 or fewer characters', () => {
+      const tags = genHashtags({ title: 'ok hi the big' });
+      expect(tags).not.toContain('#ok');
+      expect(tags).not.toContain('#hi');
+      expect(tags).not.toContain('#the');
+      expect(tags).not.toContain('#big');
+    });
+
+    it('excludes Portuguese stopwords from hashtags', () => {
+      const tags = genHashtags({ title: 'sobre quando porque então tudo' });
+      expect(tags).not.toContain('#sobre');
+      expect(tags).not.toContain('#quando');
+      expect(tags).not.toContain('#porque');
+      expect(tags).not.toContain('#então');
+    });
+
+    it('caps result at 10 hashtags', () => {
+      const title = 'alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima';
+      const tags = genHashtags({ title });
+      expect(tags.length).toBeLessThanOrEqual(10);
+    });
+  });
 });
