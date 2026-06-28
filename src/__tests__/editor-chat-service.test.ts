@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EditorChatService, type Segment } from '@/lib/ai/editor-chat';
 
+// completeMock is shared so individual tests can override its return value.
+const completeMock = vi.fn().mockResolvedValue({ content: '' });
+
 // processMessage calls AIService (Groq) — mock the entire module so only
 // pure methods are exercised without network.
 vi.mock('@/lib/ai/AIService', () => ({
   getAIService: () => ({
-    complete: vi.fn().mockResolvedValue({ content: '' }),
+    complete: completeMock,
   }),
   aiCompleteJSON: vi.fn(),
 }));
@@ -138,5 +141,153 @@ describe('EditorChatService.generateSuggestions', () => {
     ];
     const suggestions = await service.generateSuggestions(segments);
     expect(suggestions.some(s => s.includes('topico especifico'))).toBe(true);
+  });
+});
+
+// ─── EditorChatService.processMessage ────────────────────────────────────────
+
+describe('EditorChatService.processMessage', () => {
+  let service: EditorChatService;
+
+  const seg = makeSegment({ startTime: 0, endTime: 30, text: 'Hello world', isSelected: true });
+
+  beforeEach(() => {
+    completeMock.mockReset();
+    service = new EditorChatService();
+  });
+
+  it('returns empty actions and the response text when AI returns no JSON block', async () => {
+    completeMock.mockResolvedValue({ content: 'Aqui está minha resposta simples.' });
+
+    const result = await service.processMessage('olá', [seg]);
+
+    expect(result.actions).toEqual([]);
+    expect(result.response).toBe('Aqui está minha resposta simples.');
+  });
+
+  it('returns default message when AI response is empty', async () => {
+    completeMock.mockResolvedValue({ content: '' });
+
+    const result = await service.processMessage('olá', [seg]);
+
+    expect(result.actions).toEqual([]);
+    expect(result.response).toBe('Entendido! Processando sua solicitacao...');
+  });
+
+  it('extracts a single focus action from a valid JSON block', async () => {
+    const aiResponse = [
+      'Encontrei os segmentos relevantes.',
+      '',
+      '```json',
+      JSON.stringify({
+        actions: [
+          { type: 'focus', segmentIds: ['seg-001', 'seg-002'], message: 'Destacando tópico' },
+        ],
+      }),
+      '```',
+    ].join('\n');
+    completeMock.mockResolvedValue({ content: aiResponse });
+
+    const result = await service.processMessage('me mostra a introducao', [seg]);
+
+    expect(result.actions).toHaveLength(1);
+    expect(result.actions[0].type).toBe('focus');
+    expect(result.actions[0].segmentIds).toEqual(['seg-001', 'seg-002']);
+    expect(result.actions[0].message).toBe('Destacando tópico');
+  });
+
+  it('strips the JSON block from the returned response text', async () => {
+    const aiResponse = [
+      'Veja os segmentos.',
+      '```json',
+      JSON.stringify({ actions: [{ type: 'info', segmentIds: [], message: 'ok' }] }),
+      '```',
+    ].join('\n');
+    completeMock.mockResolvedValue({ content: aiResponse });
+
+    const result = await service.processMessage('busca', [seg]);
+
+    expect(result.response).toBe('Veja os segmentos.');
+    expect(result.response).not.toContain('```json');
+  });
+
+  it('extracts multiple actions from one JSON block', async () => {
+    const aiResponse = [
+      'Executando ações.',
+      '```json',
+      JSON.stringify({
+        actions: [
+          { type: 'select', segmentIds: ['seg-a'], message: 'Selecionando' },
+          { type: 'deselect', segmentIds: ['seg-b'], message: 'Removendo' },
+        ],
+      }),
+      '```',
+    ].join('\n');
+    completeMock.mockResolvedValue({ content: aiResponse });
+
+    const result = await service.processMessage('seleciona intro, remove outro', [seg]);
+
+    expect(result.actions).toHaveLength(2);
+    expect(result.actions[0].type).toBe('select');
+    expect(result.actions[1].type).toBe('deselect');
+  });
+
+  it('returns empty actions when the JSON block contains invalid JSON', async () => {
+    const aiResponse = [
+      'Resposta com JSON inválido.',
+      '```json',
+      '{ broken json :::',
+      '```',
+    ].join('\n');
+    completeMock.mockResolvedValue({ content: aiResponse });
+
+    const result = await service.processMessage('busca', [seg]);
+
+    expect(result.actions).toEqual([]);
+  });
+
+  it('returns empty actions when JSON has no "actions" key', async () => {
+    const aiResponse = [
+      'Resposta.',
+      '```json',
+      JSON.stringify({ something: 'else' }),
+      '```',
+    ].join('\n');
+    completeMock.mockResolvedValue({ content: aiResponse });
+
+    const result = await service.processMessage('busca', [seg]);
+
+    expect(result.actions).toEqual([]);
+  });
+
+  it('returns empty actions when JSON "actions" value is not an array', async () => {
+    const aiResponse = [
+      'Resposta.',
+      '```json',
+      JSON.stringify({ actions: { type: 'focus' } }),
+      '```',
+    ].join('\n');
+    completeMock.mockResolvedValue({ content: aiResponse });
+
+    const result = await service.processMessage('busca', [seg]);
+
+    expect(result.actions).toEqual([]);
+  });
+
+  it('falls back gracefully when action is missing type or message fields', async () => {
+    const aiResponse = [
+      'Resposta.',
+      '```json',
+      JSON.stringify({ actions: [{ segmentIds: ['seg-x'] }] }),
+      '```',
+    ].join('\n');
+    completeMock.mockResolvedValue({ content: aiResponse });
+
+    const result = await service.processMessage('busca', [seg]);
+
+    expect(result.actions).toHaveLength(1);
+    expect(result.actions[0].type).toBe('info');
+    expect(result.actions[0].segmentIds).toEqual(['seg-x']);
+    expect(result.actions[0].message).toBe('');
   });
 });
