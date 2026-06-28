@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from "vitest";
 import { createAnalysisService, type SegmentWithContext } from "@/lib/ai/analyze";
-import { createReorderService, type SegmentForReordering } from "@/lib/ai/reorder";
+import { createReorderService, validateReorderingDependencies, type SegmentForReordering } from "@/lib/ai/reorder";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -384,5 +384,98 @@ describe("ReorderService (mock mode)", () => {
       expect(result.outroSuggestion).toContain("opening theme");
       expect(result.outroSuggestion).toContain("closing thoughts");
     });
+  });
+});
+
+// ─── validateReorderingDependencies ──────────────────────────────────────────
+
+describe("validateReorderingDependencies", () => {
+  it("returns valid=true and empty errors for empty inputs", () => {
+    const result = validateReorderingDependencies([], []);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("returns valid=true when segments have no dependencies", () => {
+    const segments = [
+      makeSegmentForReordering("a", "intro", 80, 80),
+      makeSegmentForReordering("b", "main", 70, 75),
+    ];
+    const result = validateReorderingDependencies(segments, ["a", "b"]);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("returns an error when a proposed ID is not in the segments list", () => {
+    const segments = [makeSegmentForReordering("a", "intro", 80, 80)];
+    const result = validateReorderingDependencies(segments, ["a", "ghost"]);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain("ghost");
+  });
+
+  it("returns valid=true when a dependency comes before its dependent", () => {
+    const segments = [
+      makeSegmentForReordering("a", "intro", 80, 80),
+      makeSegmentForReordering("b", "followup", 70, 75, true, ["intro"]),
+    ];
+    // "a" (intro) comes before "b" (followup) → dependency satisfied
+    const result = validateReorderingDependencies(segments, ["a", "b"]);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("returns an error when a segment comes before its dependency", () => {
+    const segments = [
+      makeSegmentForReordering("a", "intro", 80, 80),
+      makeSegmentForReordering("b", "followup", 70, 75, true, ["intro"]),
+    ];
+    // "b" (depends on "intro") is placed first → violation
+    const result = validateReorderingDependencies(segments, ["b", "a"]);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain("followup");
+    expect(result.errors[0]).toContain("intro");
+  });
+
+  it("returns no error when a dependency topic is not found in the segments list", () => {
+    // "b" depends on "missing-topic" which no segment has
+    const segments = [
+      makeSegmentForReordering("a", "intro", 80, 80),
+      makeSegmentForReordering("b", "main", 70, 75, true, ["missing-topic"]),
+    ];
+    const result = validateReorderingDependencies(segments, ["a", "b"]);
+    // Can't validate an unknown dependency — should not error
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("accumulates multiple errors for multiple violations", () => {
+    const segments = [
+      makeSegmentForReordering("a", "intro", 80, 80),
+      makeSegmentForReordering("b", "followup", 70, 75, true, ["intro"]),
+      makeSegmentForReordering("c", "conclusion", 60, 70, true, ["intro"]),
+    ];
+    // Both "b" and "c" depend on "intro" but come before it
+    const result = validateReorderingDependencies(segments, ["b", "c", "a"]);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toHaveLength(2);
+  });
+
+  it("returns no error when a dependency segment exists but is absent from proposedOrder", () => {
+    const segments = [
+      makeSegmentForReordering("a", "intro", 80, 80),
+      makeSegmentForReordering("b", "followup", 70, 75, true, ["intro"]),
+    ];
+    // Only "b" is in proposedOrder; "a" is omitted → depPosition is undefined → no error
+    const result = validateReorderingDependencies(segments, ["b"]);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("returns valid=true for a single segment with no dependencies", () => {
+    const segments = [makeSegmentForReordering("solo", "topic", 75, 80)];
+    const result = validateReorderingDependencies(segments, ["solo"]);
+    expect(result.valid).toBe(true);
   });
 });
