@@ -253,6 +253,12 @@ describe("UploadModal", () => {
       expect(screen.queryByText(/Tipo de arquivo invalido/i)).not.toBeInTheDocument();
     });
 
+    it("accepts audio/x-wav (WAV alternative MIME) without showing an error", () => {
+      render(<UploadModal {...defaultProps()} />);
+      selectFile(makeFile("ep.wav", "audio/x-wav"));
+      expect(screen.queryByText(/Tipo de arquivo invalido/i)).not.toBeInTheDocument();
+    });
+
     it("accepts audio/x-m4a (M4A) without showing an error", () => {
       render(<UploadModal {...defaultProps()} />);
       selectFile(makeFile("ep.m4a", "audio/x-m4a"));

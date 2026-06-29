@@ -21,7 +21,7 @@ interface UploadModalProps {
   onUploadSuccess: () => void
 }
 
-const ALLOWED_TYPES = ["audio/mpeg", "audio/wav", "audio/x-m4a", "audio/mp4"]
+const ALLOWED_TYPES = ["audio/mpeg", "audio/wav", "audio/x-wav", "audio/x-m4a", "audio/mp4"]
 const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
 
 function formatFileSize(bytes: number): string {
