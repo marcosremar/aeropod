@@ -15,6 +15,7 @@ type ProjectStatus =
   | "uploaded"
   | "transcribing"
   | "analyzing"
+  | "aligning"
   | "ready"
   | "completed"
   | "failed"

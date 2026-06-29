@@ -11,8 +11,11 @@ import {
 } from "@/lib/ai/analyze";
 import type { SegmentAnalysis } from "@/lib/db/schema";
 
-// Access private methods via type casting
-type AnalysisServiceInternal = AnalysisService & {
+// Access private methods via type casting.
+// Use a standalone interface (not an intersection with AnalysisService) because
+// all the target methods are private on the class — an intersection collapses to
+// `never` when private members appear in multiple constituents.
+interface AnalysisServicePrivate {
   validateAndNormalizeAnalysis(
     analysis: Partial<SegmentAnalysis>
   ): SegmentAnalysis;
@@ -20,10 +23,10 @@ type AnalysisServiceInternal = AnalysisService & {
   buildAnalysisPrompt(segment: SegmentWithContext): string;
   clamp(value: number, min: number, max: number): number;
   extractMockTopic(text: string): string;
-};
+}
 
-function makeService(useMock = true): AnalysisServiceInternal {
-  return new AnalysisService({ useMock }) as unknown as AnalysisServiceInternal;
+function makeService(useMock = true): AnalysisServicePrivate {
+  return new AnalysisService({ useMock }) as unknown as AnalysisServicePrivate;
 }
 
 function makeSegment(
