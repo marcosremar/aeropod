@@ -81,7 +81,8 @@ export async function POST(
     }
 
     // Check if already processing
-    if (project.status === "transcribing" || project.status === "analyzing") {
+    const IN_PROGRESS_STATUSES = ["processing", "transcribing", "aligning", "analyzing"];
+    if (IN_PROGRESS_STATUSES.includes(project.status ?? "")) {
       return NextResponse.json(
         { error: "Project is already being processed" },
         { status: 409 }
