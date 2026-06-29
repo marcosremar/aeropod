@@ -144,6 +144,11 @@ describe("ProjectCard", () => {
       expect(screen.getByText("Analisando")).toBeInTheDocument();
     });
 
+    it("shows 'Alinhando' label for aligning status", () => {
+      render(<ProjectCard project={makeProject({ status: "aligning" })} onDelete={onDelete} />);
+      expect(screen.getByText("Alinhando")).toBeInTheDocument();
+    });
+
     it("shows 'Enviando' label for uploading status", () => {
       render(<ProjectCard project={makeProject({ status: "uploading" })} onDelete={onDelete} />);
       expect(screen.getByText("Enviando")).toBeInTheDocument();
@@ -177,6 +182,11 @@ describe("ProjectCard", () => {
       render(<ProjectCard project={makeProject({ status: "transcribing" })} onDelete={onDelete} />);
       expect(screen.queryByText("Clique para editar")).not.toBeInTheDocument();
     });
+
+    it("does not show 'Clique para editar' while aligning", () => {
+      render(<ProjectCard project={makeProject({ status: "aligning" })} onDelete={onDelete} />);
+      expect(screen.queryByText("Clique para editar")).not.toBeInTheDocument();
+    });
   });
 
   // ── Progress bar ─────────────────────────────────────────────────────
@@ -200,6 +210,16 @@ describe("ProjectCard", () => {
         />
       );
       expect(screen.getByText("75%")).toBeInTheDocument();
+    });
+
+    it("shows progress percentage for aligning status", () => {
+      render(
+        <ProjectCard
+          project={makeProject({ status: "aligning", progress: 60 })}
+          onDelete={onDelete}
+        />
+      );
+      expect(screen.getByText("60%")).toBeInTheDocument();
     });
 
     it("does not show progress for ready status", () => {
@@ -273,6 +293,17 @@ describe("ProjectCard", () => {
       render(
         <ProjectCard
           project={makeProject({ status: "transcribing" })}
+          onDelete={onDelete}
+        />
+      );
+      fireEvent.click(document.querySelector("div[class*='rounded-xl']")!);
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("does not navigate when clicking an aligning project", () => {
+      render(
+        <ProjectCard
+          project={makeProject({ status: "aligning" })}
           onDelete={onDelete}
         />
       );

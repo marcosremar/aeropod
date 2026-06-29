@@ -203,7 +203,7 @@ export default function DashboardPage() {
         filtered = filtered.filter((p) => p.status === "ready" || p.status === "completed")
       } else if (filterStatus === "processing") {
         filtered = filtered.filter((p) =>
-          ["uploading", "uploaded", "transcribing", "analyzing"].includes(p.status)
+          ["uploading", "uploaded", "transcribing", "aligning", "analyzing"].includes(p.status)
         )
       } else if (filterStatus === "failed") {
         filtered = filtered.filter((p) => p.status === "failed" || p.status === "error")
@@ -218,7 +218,7 @@ export default function DashboardPage() {
 
   // Computed stats
   const readyCount = projects.filter((p) => p.status === "ready" || p.status === "completed").length
-  const processingCount = projects.filter((p) => ["uploading", "uploaded", "transcribing", "analyzing"].includes(p.status)).length
+  const processingCount = projects.filter((p) => ["uploading", "uploaded", "transcribing", "aligning", "analyzing"].includes(p.status)).length
   const totalDuration = Math.round(projects.reduce((sum, p) => sum + (p.duration || 0), 0) / 60)
 
   return (
