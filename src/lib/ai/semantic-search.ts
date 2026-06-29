@@ -4,7 +4,7 @@
  * Usa Qwen3 Embedding para gerar embeddings e busca por similaridade de cosseno
  */
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "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";
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const EMBEDDING_MODEL = "qwen/qwen3-embedding-0.6b"; // Modelo leve e eficiente
 const RERANK_MODEL = "qwen/qwen3-embedding-8b"; // Modelo maior para rerank
 
@@ -75,6 +75,11 @@ export class SemanticSearchService {
    * Gera embedding para um texto
    */
   async generateEmbedding(text: string): Promise<number[]> {
+    if (!this.apiKey) {
+      console.warn("[SemanticSearch] No API key configured, returning empty embedding");
+      return [];
+    }
+
     // Check cache first
     const cached = this.cache.get(text);
     if (cached) return cached;
@@ -111,6 +116,11 @@ export class SemanticSearchService {
    * Gera embeddings para multiplos textos em batch
    */
   async generateEmbeddings(texts: string[]): Promise<EmbeddingResult[]> {
+    if (!this.apiKey) {
+      console.warn("[SemanticSearch] No API key configured, returning empty embeddings");
+      return texts.map(text => ({ text, embedding: [] }));
+    }
+
     // Filter out already cached texts
     const uncachedTexts = texts.filter(t => !this.cache.has(t));
 
@@ -168,6 +178,11 @@ export class SemanticSearchService {
     // Generate query embedding
     const queryEmbedding = await this.generateEmbedding(query);
 
+    // Without a valid embedding we cannot compute similarity — return empty results
+    if (queryEmbedding.length === 0) {
+      return [];
+    }
+
     // Generate embeddings for segments that don't have them
     const segmentsNeedingEmbeddings = segments.filter(s => !s.embedding);
     if (segmentsNeedingEmbeddings.length > 0) {
@@ -181,7 +196,7 @@ export class SemanticSearchService {
 
     // Calculate similarity scores
     let results: SearchResult[] = segments
-      .filter(s => s.embedding)
+      .filter(s => s.embedding && s.embedding.length > 0)
       .map(segment => ({
         id: segment.id,
         text: segment.text,
