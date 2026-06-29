@@ -6,6 +6,8 @@ import { Pricing } from "@/components/landing/Pricing";
 import { Comparison } from "@/components/landing/Comparison";
 import { Footer } from "@/components/landing/Footer";
 import { Problem } from "@/components/landing/Problem";
+import { Features } from "@/components/landing/Features";
+import { CTA } from "@/components/landing/CTA";
 
 describe("FAQ", () => {
   it("renders the section heading", () => {
@@ -290,5 +292,85 @@ describe("Problem", () => {
     expect(
       screen.getByText(/Voce publica menos do que gostaria/i)
     ).toBeInTheDocument();
+  });
+});
+
+describe("Features", () => {
+  it("renders the section heading", () => {
+    render(<Features />);
+    expect(
+      screen.getByText(/Tudo que voce precisa para editar/i)
+    ).toBeInTheDocument();
+  });
+
+  it("renders the 'sem editar' emphasis", () => {
+    render(<Features />);
+    expect(screen.getByText("sem editar")).toBeInTheDocument();
+  });
+
+  it("renders the section subheading", () => {
+    render(<Features />);
+    expect(
+      screen.getByText(/Features pensadas para quem quer publicar mais/i)
+    ).toBeInTheDocument();
+  });
+
+  it("renders all six feature titles", () => {
+    render(<Features />);
+    expect(screen.getByText("Selecao inteligente")).toBeInTheDocument();
+    expect(screen.getByText("Deteccao de erros")).toBeInTheDocument();
+    expect(screen.getByText("Regravacao inline")).toBeInTheDocument();
+    expect(screen.getByText("Reorganizacao narrativa")).toBeInTheDocument();
+    expect(screen.getByText("Export pronto")).toBeInTheDocument();
+    expect(screen.getByText("Economize horas")).toBeInTheDocument();
+  });
+
+  it("renders feature descriptions", () => {
+    render(<Features />);
+    expect(
+      screen.getByText(/IA identifica os momentos mais interessantes/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Corrija trechos problematicos gravando direto/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/O que levaria 4\+ horas agora leva 15 minutos/i)
+    ).toBeInTheDocument();
+  });
+});
+
+describe("CTA", () => {
+  it("renders the beta access badge", () => {
+    render(<CTA />);
+    expect(
+      screen.getByText(/Vagas limitadas para o beta/i)
+    ).toBeInTheDocument();
+  });
+
+  it("renders the main heading", () => {
+    render(<CTA />);
+    expect(
+      screen.getByText(/Seja um dos primeiros a testar/i)
+    ).toBeInTheDocument();
+  });
+
+  it("renders the subheading", () => {
+    render(<CTA />);
+    expect(
+      screen.getByText(/Entre na lista de espera e ganhe acesso antecipado/i)
+    ).toBeInTheDocument();
+  });
+
+  it("renders the no-spam disclaimer", () => {
+    render(<CTA />);
+    expect(
+      screen.getByText(/Sem spam\. Apenas um email quando lancarmos\./i)
+    ).toBeInTheDocument();
+  });
+
+  it("embeds the WaitlistForm with email input", () => {
+    render(<CTA />);
+    expect(screen.getByTestId("email-input")).toBeInTheDocument();
+    expect(screen.getByTestId("submit-button")).toBeInTheDocument();
   });
 });
