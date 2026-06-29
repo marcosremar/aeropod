@@ -1,28 +1,38 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
-vi.mock("@/lib/db", () => {
-  const mockDb = {
-    select: vi.fn(),
-    insert: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  };
-  return {
-    db: mockDb,
-    projects: "projects_table",
-    segments: "segments_table",
-  };
-});
+// Hoisted so the mock factory and the resetModules-based describe block share the
+// exact same vi.fn() instances across module reloads.
+const { mockDbSelect, mockDbInsert, mockDbUpdate, mockGroqCreate } = vi.hoisted(() => ({
+  mockDbSelect: vi.fn(),
+  mockDbInsert: vi.fn(),
+  mockDbUpdate: vi.fn(),
+  mockGroqCreate: vi.fn().mockResolvedValue({ segments: [], words: [] }),
+}));
 
+vi.mock("@/lib/db", () => ({
+  db: {
+    select: mockDbSelect,
+    insert: mockDbInsert,
+    update: mockDbUpdate,
+    delete: vi.fn(),
+  },
+  projects: "projects_table",
+  segments: "segments_table",
+}));
+
+// Use a `function` (not arrow) implementation so `new Groq()` works after
+// vi.resetModules() re-runs this factory in the happy-path describe block.
 vi.mock("groq-sdk", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    audio: {
-      transcriptions: {
-        create: vi.fn().mockResolvedValue({ segments: [], words: [] }),
+  default: vi.fn().mockImplementation(function () {
+    return {
+      audio: {
+        transcriptions: {
+          create: mockGroqCreate,
+        },
       },
-    },
-  })),
+    };
+  }),
 }));
 
 vi.mock("@/lib/ai/AIService", () => ({
@@ -197,5 +207,80 @@ describe("POST /api/process/[id]", () => {
 
     expect(res.status).toBe(500);
     expect(data.error).toBe("Failed to start processing");
+  });
+});
+
+// ── Happy path (GROQ_API_KEY present) ────────────────────────────────────────
+// These tests reload the module so the module-level GROQ_API_KEY constant is
+// captured with the key set. They share the hoisted vi.fn() references so that
+// mockDbSelect etc. control the same function the fresh module import sees.
+
+describe("POST /api/process/[id] — happy path (GROQ_API_KEY set)", () => {
+  let POST: (
+    req: NextRequest,
+    ctx: { params: Promise<{ id: string }> }
+  ) => Promise<Response>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    process.env.GROQ_API_KEY = "test-groq-key";
+    vi.resetModules();
+    const module = await import("@/app/api/process/[id]/route");
+    POST = module.POST;
+
+    // Default update stub so background fire-and-forget doesn't throw
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockResolvedValue([]),
+    });
+  });
+
+  afterEach(() => {
+    delete process.env.GROQ_API_KEY;
+  });
+
+  it("returns 200 with 'Processing started' when project is valid", async () => {
+    mockDbSelect.mockReturnValue(buildSelectChain([SAMPLE_PROJECT]));
+
+    const res = await POST(
+      new NextRequest(`http://localhost/api/process/${VALID_UUID}`, { method: "POST" }),
+      { params: Promise.resolve({ id: VALID_UUID }) }
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.message).toBe("Processing started");
+    expect(data.projectId).toBe(VALID_UUID);
+    expect(data.status).toBe("processing");
+  });
+
+  it("returns 200 when project language is null (defaults to 'pt' in background)", async () => {
+    mockDbSelect.mockReturnValue(
+      buildSelectChain([{ ...SAMPLE_PROJECT, language: null }])
+    );
+
+    const res = await POST(
+      new NextRequest(`http://localhost/api/process/${VALID_UUID}`, { method: "POST" }),
+      { params: Promise.resolve({ id: VALID_UUID }) }
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.status).toBe("processing");
+  });
+
+  it("returns 200 for a project with 'ready' status (non-processing terminal state)", async () => {
+    mockDbSelect.mockReturnValue(
+      buildSelectChain([{ ...SAMPLE_PROJECT, status: "ready" }])
+    );
+
+    const res = await POST(
+      new NextRequest(`http://localhost/api/process/${VALID_UUID}`, { method: "POST" }),
+      { params: Promise.resolve({ id: VALID_UUID }) }
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.message).toBe("Processing started");
   });
 });
