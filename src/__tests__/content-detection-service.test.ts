@@ -300,3 +300,102 @@ describe("ContentDetectionService.getLatestDetection", () => {
     expect(result).toEqual(record);
   });
 });
+
+// ─── detectAndSave ────────────────────────────────────────────────────────────
+
+describe("ContentDetectionService.detectAndSave", () => {
+  let svc: ContentDetectionService;
+  let fakeDb: ReturnType<typeof buildFakeDb>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fakeDb = buildFakeDb();
+    svc = new ContentDetectionService(fakeDb as any);
+    mockAiCompleteJSON.mockResolvedValue(DETECTION_RESULT);
+    mockGetTemplatesByCategory.mockResolvedValue([TEMPLATE_A]);
+    mockGetTemplateWithSections.mockResolvedValue({ id: TEMPLATE_A.id, sections: [] });
+    mockGetSystemTemplates.mockResolvedValue([]);
+  });
+
+  it("resolves to void on success", async () => {
+    const result = await svc.detectAndSave(PROJECT_ID, "Interview transcript");
+    expect(result).toBeUndefined();
+  });
+
+  it("inserts a detection record with projectId, detectedType, confidence, and reasoning", async () => {
+    await svc.detectAndSave(PROJECT_ID, "Interview transcript");
+
+    expect(fakeDb._insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: PROJECT_ID,
+        detectedType: "interview",
+        confidence: 0.92,
+        reasoning: "Clear Q&A pattern",
+      })
+    );
+  });
+
+  it("includes a suggestedTemplates array in the inserted record", async () => {
+    await svc.detectAndSave(PROJECT_ID, "Interview transcript");
+
+    const args = fakeDb._insertValues.mock.calls[0][0];
+    expect(Array.isArray(args.suggestedTemplates)).toBe(true);
+  });
+
+  it("saves analysisData with speakers, questionAnswerPatterns, narrativeStructure, and characteristics", async () => {
+    await svc.detectAndSave(PROJECT_ID, "Interview transcript");
+
+    const args = fakeDb._insertValues.mock.calls[0][0];
+    expect(args.analysisData).toMatchObject({
+      speakers: DETECTION_RESULT.speakers,
+      questionAnswerPatterns: DETECTION_RESULT.questionAnswerPatterns,
+      narrativeStructure: DETECTION_RESULT.narrativeStructure,
+      characteristics: DETECTION_RESULT.characteristics,
+    });
+  });
+
+  it("updates the project with contentType set to the detected type and detectionStatus='detected'", async () => {
+    await svc.detectAndSave(PROJECT_ID, "Interview transcript");
+
+    expect(fakeDb._updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contentType: "interview",
+        detectionStatus: "detected",
+      })
+    );
+  });
+
+  it("performs the DB insert before the project update", async () => {
+    const callOrder: string[] = [];
+    fakeDb._insertValues.mockImplementation(async () => {
+      callOrder.push("insert");
+      return [];
+    });
+    fakeDb._updateSet.mockImplementation(() => {
+      callOrder.push("update");
+      return { where: vi.fn().mockResolvedValue([]) };
+    });
+
+    await svc.detectAndSave(PROJECT_ID, "Interview transcript");
+
+    expect(callOrder[0]).toBe("insert");
+    expect(callOrder[1]).toBe("update");
+  });
+
+  it("saves the monologue fallback type when AI detection fails", async () => {
+    mockAiCompleteJSON.mockRejectedValue(new Error("AI unavailable"));
+    mockGetTemplatesByCategory.mockResolvedValue([]);
+
+    await svc.detectAndSave(PROJECT_ID, "Some transcript");
+
+    const args = fakeDb._insertValues.mock.calls[0][0];
+    expect(args.detectedType).toBe("monologue");
+    expect(args.confidence).toBe(0.3);
+  });
+
+  it("throws when the DB insert fails", async () => {
+    fakeDb._insertValues.mockRejectedValue(new Error("Insert failed"));
+
+    await expect(svc.detectAndSave(PROJECT_ID, "transcript")).rejects.toThrow("Insert failed");
+  });
+});
