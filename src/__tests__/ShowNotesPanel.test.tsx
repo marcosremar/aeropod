@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { ShowNotesPanel } from "@/components/editor/ShowNotesPanel";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────
@@ -18,13 +19,13 @@ vi.mock("@/components/ui/tabs", async () => {
   const R = await import("react");
   const ce = R.createElement;
   return {
-    Tabs: ({ children, defaultValue: _dv, ...props }: { children?: R.ReactNode; defaultValue?: string; [key: string]: unknown }) =>
+    Tabs: ({ children, defaultValue: _dv, ...props }: { children?: ReactNode; defaultValue?: string; [key: string]: unknown }) =>
       ce("div", { "data-tabs": true, ...props }, children),
-    TabsList: ({ children, ...props }: { children?: R.ReactNode; [key: string]: unknown }) =>
+    TabsList: ({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) =>
       ce("div", { role: "tablist", ...props }, children),
-    TabsTrigger: ({ children, value, ...props }: { children?: R.ReactNode; value?: string; [key: string]: unknown }) =>
+    TabsTrigger: ({ children, value, ...props }: { children?: ReactNode; value?: string; [key: string]: unknown }) =>
       ce("button", { role: "tab", "data-tab-value": value, ...props }, children),
-    TabsContent: ({ children, ...props }: { children?: R.ReactNode; [key: string]: unknown }) =>
+    TabsContent: ({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) =>
       ce("div", props, children),
   };
 });

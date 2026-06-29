@@ -13,14 +13,16 @@ import { SegmentMappingService } from "@/lib/sections/SegmentMappingService";
 
 // ─── ShowNotesService pure helpers ───────────────────────────────────────────
 
-// Access private methods via casting
-type ShowNotesServiceInternal = ShowNotesService & {
+// Access private methods via casting.
+// Use a standalone interface (not an intersection with ShowNotesService) because
+// both methods are private on the class — intersecting would collapse to `never`.
+interface ShowNotesServicePrivate {
   formatTimestamp(seconds: number): string;
   buildTranscript(segments: { startTime: number; text: string }[]): string;
-};
+}
 
-function makeService(): ShowNotesServiceInternal {
-  return new ShowNotesService() as unknown as ShowNotesServiceInternal;
+function makeService(): ShowNotesServicePrivate {
+  return new ShowNotesService() as unknown as ShowNotesServicePrivate;
 }
 
 describe("ShowNotesService.formatTimestamp", () => {
