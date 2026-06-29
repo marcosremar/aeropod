@@ -323,6 +323,192 @@ describe("SemanticSearchService.search", () => {
   });
 });
 
+// ─── search — useRerank: true ────────────────────────────────────────────────
+
+describe("SemanticSearchService.search — useRerank: true", () => {
+  let svc: SemanticSearchService;
+
+  beforeEach(() => {
+    svc = new SemanticSearchService({ apiKey: "test-key" });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubEmbeddingThenRerank(rerankContent: string, rerankOk = true) {
+    const fetchMock = vi
+      .fn()
+      // First call: query embedding
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [{ embedding: [1, 0, 0, 0] }] }),
+        text: async () => "",
+      });
+
+    if (rerankOk) {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: rerankContent } }] }),
+        text: async () => "",
+      });
+    } else {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        text: async () => rerankContent,
+      });
+    }
+
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("reranks results using the index order returned by the API", async () => {
+    // All segments have identical embeddings (score 1.0), so stable sort preserves
+    // insertion order: results passed to rerank will be [a, b, c] at indices [0, 1, 2].
+    // Rerank returns [2, 0, 1] → expect c, a, b.
+    const segments: SegmentWithEmbedding[] = [
+      makeSegment("a", "segment A", [1, 0, 0, 0]),
+      makeSegment("b", "segment B", [1, 0, 0, 0]),
+      makeSegment("c", "segment C", [1, 0, 0, 0]),
+    ];
+
+    const fetchMock = stubEmbeddingThenRerank("[2, 0, 1]");
+
+    const results = await svc.search("query", segments, {
+      topK: 3,
+      minScore: 0,
+      useRerank: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(results[0].id).toBe("c");
+    expect(results[1].id).toBe("a");
+    expect(results[2].id).toBe("b");
+  });
+
+  it("falls back to cosine-similarity order when the rerank API returns non-ok", async () => {
+    const segments: SegmentWithEmbedding[] = [
+      makeSegment("first", "seg a", [1, 0, 0, 0]),
+      makeSegment("second", "seg b", [1, 0, 0, 0]),
+    ];
+
+    stubEmbeddingThenRerank("Service unavailable", false);
+
+    const results = await svc.search("query", segments, {
+      topK: 2,
+      minScore: 0,
+      useRerank: true,
+    });
+
+    expect(results).toHaveLength(2);
+    expect(results[0].id).toBe("first");
+    expect(results[1].id).toBe("second");
+  });
+
+  it("falls back to original order when the rerank response has no bracket array", async () => {
+    const segments: SegmentWithEmbedding[] = [
+      makeSegment("x", "seg x", [1, 0, 0, 0]),
+      makeSegment("y", "seg y", [1, 0, 0, 0]),
+    ];
+
+    // Content with no "[digits]" pattern → regex returns undefined → JSON.parse("[]")
+    stubEmbeddingThenRerank("no brackets here at all");
+
+    const results = await svc.search("query", segments, {
+      topK: 2,
+      minScore: 0,
+      useRerank: true,
+    });
+
+    expect(results).toHaveLength(2);
+    expect(results[0].id).toBe("x");
+    expect(results[1].id).toBe("y");
+  });
+
+  it("appends results omitted by the rerank response to the end", async () => {
+    const segments: SegmentWithEmbedding[] = [
+      makeSegment("a", "seg a", [1, 0, 0, 0]),
+      makeSegment("b", "seg b", [1, 0, 0, 0]),
+      makeSegment("c", "seg c", [1, 0, 0, 0]),
+    ];
+
+    // Rerank only names index 1 — a and c should be appended after b
+    stubEmbeddingThenRerank("[1]");
+
+    const results = await svc.search("query", segments, {
+      topK: 3,
+      minScore: 0,
+      useRerank: true,
+    });
+
+    expect(results).toHaveLength(3);
+    expect(results[0].id).toBe("b"); // explicitly ranked first
+    // a and c appear in some order after b
+    const tail = results.slice(1).map(r => r.id).sort();
+    expect(tail).toEqual(["a", "c"]);
+  });
+
+  it("silently drops out-of-range indices from the rerank response", async () => {
+    const segments: SegmentWithEmbedding[] = [
+      makeSegment("only", "only segment", [1, 0, 0, 0]),
+    ];
+
+    // Index 99 is out of range; only index 0 is valid
+    stubEmbeddingThenRerank("[99, 0]");
+
+    const results = await svc.search("query", segments, {
+      topK: 2,
+      minScore: 0,
+      useRerank: true,
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].id).toBe("only");
+  });
+
+  it("skips the rerank call when no segments pass the score threshold", async () => {
+    const segments: SegmentWithEmbedding[] = [
+      // Orthogonal to query → score 0
+      makeSegment("z", "seg z", [0, 1, 0, 0]),
+    ];
+
+    const fetchMock = stubEmbeddingThenRerank("[0]");
+
+    const results = await svc.search("query", segments, {
+      topK: 1,
+      minScore: 0.5,
+      useRerank: true,
+    });
+
+    // No results pass threshold → rerank is never called
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(results).toHaveLength(0);
+  });
+
+  it("respects topK even after reranking", async () => {
+    const segments: SegmentWithEmbedding[] = [
+      makeSegment("a", "seg a", [1, 0, 0, 0]),
+      makeSegment("b", "seg b", [1, 0, 0, 0]),
+      makeSegment("c", "seg c", [1, 0, 0, 0]),
+      makeSegment("d", "seg d", [1, 0, 0, 0]),
+    ];
+
+    // Rerank returns all 4 indices
+    stubEmbeddingThenRerank("[3, 2, 1, 0]");
+
+    const results = await svc.search("query", segments, {
+      topK: 2,
+      minScore: 0,
+      useRerank: true,
+    });
+
+    expect(results).toHaveLength(2);
+    expect(results[0].id).toBe("d"); // index 3
+    expect(results[1].id).toBe("c"); // index 2
+  });
+});
+
 // ─── getSemanticSearchService singleton ──────────────────────────────────────
 
 describe("getSemanticSearchService", () => {
