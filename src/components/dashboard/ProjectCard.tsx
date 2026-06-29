@@ -10,6 +10,7 @@ type ProjectStatus =
   | "uploading"
   | "uploaded"
   | "transcribing"
+  | "aligning"
   | "analyzing"
   | "ready"
   | "completed"
@@ -69,6 +70,15 @@ const statusConfig: Record<
     description: "IA transcrevendo...",
     icon: Loader2,
     progressColor: "bg-purple-500",
+  },
+  aligning: {
+    color: "text-cyan-400",
+    bgColor: "bg-cyan-500/10",
+    borderColor: "border-cyan-500/20",
+    label: "Alinhando",
+    description: "Alinhando timestamps...",
+    icon: Loader2,
+    progressColor: "bg-cyan-500",
   },
   analyzing: {
     color: "text-amber-400",
@@ -149,7 +159,7 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const statusInfo = statusConfig[project.status as ProjectStatus] || statusConfig.ready
   const StatusIcon = statusInfo.icon
-  const isProcessing = ["uploading", "uploaded", "transcribing", "analyzing"].includes(
+  const isProcessing = ["uploading", "uploaded", "transcribing", "aligning", "analyzing"].includes(
     project.status
   )
 
