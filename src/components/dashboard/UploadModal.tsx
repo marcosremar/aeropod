@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Upload, X, FileAudio, Loader2, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
@@ -52,6 +52,15 @@ export function UploadModal({
   const [isUploading, setIsUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<"uploading" | "processing" | "done">("uploading")
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current !== null) {
+        clearInterval(progressIntervalRef.current)
+      }
+    }
+  }, [])
 
   const resetForm = useCallback(() => {
     setFile(null)
@@ -149,10 +158,11 @@ export function UploadModal({
       formData.append("title", title)
       formData.append("language", language)
 
-      const progressInterval = setInterval(() => {
+      progressIntervalRef.current = setInterval(() => {
         setUploadProgress((prev) => {
           if (prev >= 90) {
-            clearInterval(progressInterval)
+            clearInterval(progressIntervalRef.current!)
+            progressIntervalRef.current = null
             return prev
           }
           return prev + 10
@@ -164,7 +174,8 @@ export function UploadModal({
         body: formData,
       })
 
-      clearInterval(progressInterval)
+      clearInterval(progressIntervalRef.current!)
+      progressIntervalRef.current = null
       setUploadProgress(100)
 
       if (!response.ok) {
