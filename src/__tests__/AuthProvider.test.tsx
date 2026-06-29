@@ -235,7 +235,7 @@ describe("AuthProvider – login", () => {
     });
 
     expect(thrownError).not.toBeNull();
-    expect((thrownError as Error).message).toBe("Invalid credentials");
+    expect(thrownError!.message).toBe("Invalid credentials");
   });
 
   it("throws 'Failed to login' when error response has no message", async () => {
@@ -282,7 +282,7 @@ describe("AuthProvider – login", () => {
       fireEvent.click(screen.getByText("login-bad"));
     });
 
-    expect((thrownError as Error).message).toBe("Failed to login");
+    expect(thrownError!.message).toBe("Failed to login");
   });
 });
 

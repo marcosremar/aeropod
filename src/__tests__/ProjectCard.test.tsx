@@ -10,11 +10,21 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+type ProjectStatus =
+  | "uploading"
+  | "uploaded"
+  | "transcribing"
+  | "analyzing"
+  | "ready"
+  | "completed"
+  | "failed"
+  | "error";
+
 const makeProject = (
   overrides: Partial<{
     id: string;
     title: string;
-    status: string;
+    status: ProjectStatus;
     duration: number;
     createdAt: string;
     progress: number;
@@ -23,7 +33,7 @@ const makeProject = (
 ) => ({
   id: "proj-1",
   title: "My Podcast Episode",
-  status: "ready" as const,
+  status: "ready" as ProjectStatus,
   duration: 3665, // 61:05
   createdAt: new Date().toISOString(),
   progress: undefined,
