@@ -28,6 +28,8 @@ import {
   GROQ_MODELS,
   OPENROUTER_MODELS,
   getAIService,
+  aiComplete,
+  aiCompleteJSON,
   type TaskType,
 } from "@/lib/ai/AIService";
 
@@ -306,5 +308,146 @@ describe("getAIService singleton", () => {
   it("returned instance has listTasks method", () => {
     const svc = getAIService();
     expect(typeof svc.listTasks).toBe("function");
+  });
+});
+
+// ─── aiComplete convenience function ─────────────────────────────────────────
+
+describe("aiComplete", () => {
+  let completeSpy: ReturnType<typeof vi.spyOn<AIService, "complete">>;
+
+  beforeEach(() => {
+    const svc = getAIService();
+    completeSpy = vi.spyOn(svc, "complete");
+  });
+
+  afterEach(() => {
+    completeSpy.mockRestore();
+  });
+
+  it("returns the content string from the AI response", async () => {
+    completeSpy.mockResolvedValueOnce({
+      content: "Hello, world!",
+      model: "mock",
+      provider: "groq",
+      latencyMs: 1,
+    });
+    const result = await aiComplete("editor_chat", "Say hello");
+    expect(result).toBe("Hello, world!");
+  });
+
+  it("sends a user message with the provided prompt", async () => {
+    completeSpy.mockResolvedValueOnce({
+      content: "ok",
+      model: "mock",
+      provider: "groq",
+      latencyMs: 1,
+    });
+    await aiComplete("segment_analysis", "Analyze this segment");
+    const options = completeSpy.mock.calls[0][0];
+    const userMsg = options.messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toBe("Analyze this segment");
+  });
+
+  it("prepends a system message when systemPrompt is provided", async () => {
+    completeSpy.mockResolvedValueOnce({
+      content: "ok",
+      model: "mock",
+      provider: "groq",
+      latencyMs: 1,
+    });
+    await aiComplete("segment_analysis", "Analyze", "You are a podcast editor");
+    const options = completeSpy.mock.calls[0][0];
+    expect(options.messages[0].role).toBe("system");
+    expect(options.messages[0].content).toBe("You are a podcast editor");
+    expect(options.messages[1].role).toBe("user");
+  });
+
+  it("sends only one message when no systemPrompt is provided", async () => {
+    completeSpy.mockResolvedValueOnce({
+      content: "ok",
+      model: "mock",
+      provider: "groq",
+      latencyMs: 1,
+    });
+    await aiComplete("segment_mapping", "Map segments");
+    const options = completeSpy.mock.calls[0][0];
+    expect(options.messages).toHaveLength(1);
+    expect(options.messages[0].role).toBe("user");
+  });
+
+  it("passes the task type through to complete()", async () => {
+    completeSpy.mockResolvedValueOnce({
+      content: "ok",
+      model: "mock",
+      provider: "groq",
+      latencyMs: 1,
+    });
+    await aiComplete("show_notes", "Generate");
+    expect(completeSpy.mock.calls[0][0].task).toBe("show_notes");
+  });
+});
+
+// ─── aiCompleteJSON convenience function ─────────────────────────────────────
+
+describe("aiCompleteJSON", () => {
+  let completeJSONSpy: ReturnType<typeof vi.spyOn<AIService, "completeJSON">>;
+
+  beforeEach(() => {
+    const svc = getAIService();
+    completeJSONSpy = vi.spyOn(svc, "completeJSON");
+  });
+
+  afterEach(() => {
+    completeJSONSpy.mockRestore();
+  });
+
+  it("returns the parsed object from completeJSON", async () => {
+    completeJSONSpy.mockResolvedValueOnce({ topic: "AI", score: 8 });
+    const result = await aiCompleteJSON<{ topic: string; score: number }>(
+      "segment_analysis",
+      "Analyze"
+    );
+    expect(result.topic).toBe("AI");
+    expect(result.score).toBe(8);
+  });
+
+  it("sends a user message with the provided prompt", async () => {
+    completeJSONSpy.mockResolvedValueOnce({ ok: true });
+    await aiCompleteJSON("segment_mapping", "My prompt");
+    const options = completeJSONSpy.mock.calls[0][0];
+    const userMsg = options.messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toBe("My prompt");
+  });
+
+  it("prepends a system message when systemPrompt is provided", async () => {
+    completeJSONSpy.mockResolvedValueOnce({ ok: true });
+    await aiCompleteJSON("show_notes", "Generate notes", "Be concise");
+    const options = completeJSONSpy.mock.calls[0][0];
+    expect(options.messages[0].role).toBe("system");
+    expect(options.messages[0].content).toBe("Be concise");
+    expect(options.messages[1].role).toBe("user");
+  });
+
+  it("sends only one message when no systemPrompt is provided", async () => {
+    completeJSONSpy.mockResolvedValueOnce({ ok: true });
+    await aiCompleteJSON("segment_reorder", "Reorder");
+    const options = completeJSONSpy.mock.calls[0][0];
+    expect(options.messages).toHaveLength(1);
+  });
+
+  it("passes the task type through to completeJSON()", async () => {
+    completeJSONSpy.mockResolvedValueOnce({ ok: true });
+    await aiCompleteJSON("gap_analysis", "Find gaps");
+    expect(completeJSONSpy.mock.calls[0][0].task).toBe("gap_analysis");
+  });
+
+  it("propagates rejections from completeJSON", async () => {
+    completeJSONSpy.mockRejectedValueOnce(
+      new Error("Resposta da IA não é um JSON válido")
+    );
+    await expect(aiCompleteJSON("gap_analysis", "Find gaps")).rejects.toThrow(
+      "Resposta da IA não é um JSON válido"
+    );
   });
 });
