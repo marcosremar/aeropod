@@ -53,6 +53,9 @@ export async function PATCH(
       }
     }
 
+    // Always stamp the modification time
+    filteredUpdates.updatedAt = new Date();
+
     console.log("[Segment API] Filtered updates:", filteredUpdates);
 
     // Update the segment
