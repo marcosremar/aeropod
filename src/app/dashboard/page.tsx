@@ -27,9 +27,14 @@ import { cn } from "@/lib/utils"
 
 type ProjectStatus =
   | "uploading"
+  | "uploaded"
+  | "processing"
   | "transcribing"
+  | "aligning"
   | "analyzing"
   | "ready"
+  | "completed"
+  | "failed"
   | "error"
 
 interface Project {
@@ -356,6 +361,17 @@ export default function DashboardPage() {
                     )}
                   >
                     Processando
+                  </button>
+                  <button
+                    onClick={() => setFilterStatus("failed")}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer",
+                      filterStatus === "failed"
+                        ? "bg-red-500/20 text-red-400"
+                        : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                  >
+                    Falhou
                   </button>
                 </div>
 
