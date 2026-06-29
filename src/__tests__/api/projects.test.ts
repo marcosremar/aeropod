@@ -437,8 +437,59 @@ describe("Projects API – PATCH /api/projects/[id]", () => {
     const res = await PATCH(req, ctx);
 
     expect(res.status).toBe(200);
-    // update should have been called: deselect all + select seg-1
-    expect(vi.mocked(db.update)).toHaveBeenCalledTimes(2);
+    // update should have been called: stamp project updatedAt + deselect all + select seg-1
+    expect(vi.mocked(db.update)).toHaveBeenCalledTimes(3);
+  });
+
+  it("reorders segments via segmentOrder and stamps project updatedAt", async () => {
+    const updatedProject = { ...SAMPLE_PROJECT };
+
+    vi.mocked(db.select)
+      .mockReturnValueOnce(buildSelectChain([SAMPLE_PROJECT]) as any)
+      .mockReturnValueOnce(buildSelectChain([updatedProject]) as any)
+      .mockReturnValueOnce(buildSelectChain(SAMPLE_SEGMENTS) as any);
+
+    vi.mocked(db.update).mockReturnValue(buildUpdateChain() as any);
+
+    const req = new NextRequest(`http://localhost/api/projects/${VALID_UUID}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        segmentOrder: [
+          { segmentId: SEG_UUID_1, order: 2 },
+          { segmentId: SEG_UUID_2, order: 1 },
+        ],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const ctx = { params: Promise.resolve({ id: VALID_UUID }) };
+
+    const res = await PATCH(req, ctx);
+
+    expect(res.status).toBe(200);
+    // stamp project updatedAt + update order for each of the 2 segments
+    expect(vi.mocked(db.update)).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not call db.update when body is empty object", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(buildSelectChain([SAMPLE_PROJECT]) as any)
+      .mockReturnValueOnce(buildSelectChain([SAMPLE_PROJECT]) as any)
+      .mockReturnValueOnce(buildSelectChain(SAMPLE_SEGMENTS) as any);
+
+    vi.mocked(db.update).mockReturnValue(buildUpdateChain() as any);
+
+    const req = new NextRequest(`http://localhost/api/projects/${VALID_UUID}`, {
+      method: "PATCH",
+      body: JSON.stringify({}),
+      headers: { "Content-Type": "application/json" },
+    });
+    const ctx = { params: Promise.resolve({ id: VALID_UUID }) };
+
+    const res = await PATCH(req, ctx);
+
+    expect(res.status).toBe(200);
+    // no fields provided — no update calls
+    expect(vi.mocked(db.update)).toHaveBeenCalledTimes(0);
   });
 });
 

@@ -118,12 +118,17 @@ export async function PATCH(
       );
     }
 
-    // Update project fields
+    // Update project fields; always stamp updatedAt when any field changes
     const updateData: any = { updatedAt: new Date() };
     if (title !== undefined) updateData.title = title;
     if (targetDuration !== undefined) updateData.targetDuration = targetDuration;
 
-    if (Object.keys(updateData).length > 1) { // More than just updatedAt
+    if (
+      title !== undefined ||
+      targetDuration !== undefined ||
+      selectedSegments !== undefined ||
+      segmentOrder !== undefined
+    ) {
       await db
         .update(projects)
         .set(updateData)
