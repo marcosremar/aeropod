@@ -301,4 +301,38 @@ describe("PATCH /api/projects/[id]/segments/[segmentId]", () => {
     expect(res.status).toBe(500);
     expect(data.error).toMatch(/failed to update/i);
   });
+
+  it("always stamps updatedAt with a current Date on every PATCH", async () => {
+    const updateChain = buildUpdateChain([SAMPLE_SEGMENT]);
+    vi.mocked(db.select).mockReturnValue(
+      buildSelectChain([SAMPLE_SEGMENT]) as any
+    );
+    vi.mocked(db.update).mockReturnValue(updateChain as any);
+
+    const before = Date.now();
+
+    const req = new NextRequest(
+      `http://localhost/api/projects/${PROJECT_ID}/segments/${SEGMENT_ID}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ text: "Some new text" }),
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    const ctx = {
+      params: Promise.resolve({ id: PROJECT_ID, segmentId: SEGMENT_ID }),
+    };
+
+    await PATCH(req, ctx);
+
+    const after = Date.now();
+
+    const setMock = vi.mocked(updateChain.set);
+    expect(setMock).toHaveBeenCalledTimes(1);
+    const passed = setMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(passed.updatedAt).toBeInstanceOf(Date);
+    const ts = (passed.updatedAt as Date).getTime();
+    expect(ts).toBeGreaterThanOrEqual(before);
+    expect(ts).toBeLessThanOrEqual(after);
+  });
 });
