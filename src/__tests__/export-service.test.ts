@@ -4,6 +4,7 @@ import {
   createExportService,
   TemplateExportService,
   FFmpegExportService,
+  computePartsToKeep,
 } from '@/lib/audio/export';
 import type { AudioChunk } from '@/lib/audio/chunking';
 
@@ -261,5 +262,107 @@ describe('TemplateExportService.exportTemplateBasedProject', () => {
     // Section with order=1 (startTime=100) should be processed first
     expect(extractCalls[0]).toBe(100);
     expect(extractCalls[1]).toBe(200);
+  });
+});
+
+// ─── computePartsToKeep ───────────────────────────────────────────────────────
+
+describe('computePartsToKeep', () => {
+  it('returns the full segment when there are no cuts', () => {
+    const result = computePartsToKeep(10, 50, []);
+    expect(result).toEqual([{ start: 10, end: 50 }]);
+  });
+
+  it('returns two parts when a single cut is in the middle', () => {
+    // Segment: 0–100s; cut the middle 25–75%
+    const result = computePartsToKeep(0, 100, [{ startPercent: 0.25, endPercent: 0.75 }]);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ start: 0, end: 25 });
+    expect(result[1]).toEqual({ start: 75, end: 100 });
+  });
+
+  it('returns one trailing part when cut covers the start', () => {
+    const result = computePartsToKeep(0, 100, [{ startPercent: 0, endPercent: 0.4 }]);
+    expect(result).toEqual([{ start: 40, end: 100 }]);
+  });
+
+  it('returns one leading part when cut covers the end', () => {
+    const result = computePartsToKeep(0, 100, [{ startPercent: 0.6, endPercent: 1 }]);
+    expect(result).toEqual([{ start: 0, end: 60 }]);
+  });
+
+  it('returns empty array when a single cut spans the entire segment', () => {
+    const result = computePartsToKeep(0, 100, [{ startPercent: 0, endPercent: 1 }]);
+    expect(result).toHaveLength(0);
+  });
+
+  it('merges overlapping cuts and returns correct kept ranges', () => {
+    // cuts: 0.1–0.5 and 0.4–0.8 (overlap at 0.4–0.5)
+    const result = computePartsToKeep(0, 100, [
+      { startPercent: 0.1, endPercent: 0.5 },
+      { startPercent: 0.4, endPercent: 0.8 },
+    ]);
+    // Keep: 0–10, 80–100
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ start: 0, end: 10 });
+    expect(result[1]).toEqual({ start: 80, end: 100 });
+  });
+
+  it('handles cuts provided out of order by sorting them first', () => {
+    // Same as previous test but cuts given in reverse order
+    const result = computePartsToKeep(0, 100, [
+      { startPercent: 0.4, endPercent: 0.8 },
+      { startPercent: 0.1, endPercent: 0.5 },
+    ]);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ start: 0, end: 10 });
+    expect(result[1]).toEqual({ start: 80, end: 100 });
+  });
+
+  it('handles two non-overlapping cuts and returns three parts', () => {
+    const result = computePartsToKeep(0, 100, [
+      { startPercent: 0.2, endPercent: 0.4 },
+      { startPercent: 0.6, endPercent: 0.8 },
+    ]);
+    expect(result).toHaveLength(3);
+    expect(result[0]).toEqual({ start: 0, end: 20 });
+    expect(result[1]).toEqual({ start: 40, end: 60 });
+    expect(result[2]).toEqual({ start: 80, end: 100 });
+  });
+
+  it('respects a non-zero startTime offset correctly', () => {
+    // Segment starts at 30s, ends at 130s (100s duration)
+    // Cut the first 50%: absolute range 30–80s removed, keep 80–130s
+    const result = computePartsToKeep(30, 130, [{ startPercent: 0, endPercent: 0.5 }]);
+    expect(result).toEqual([{ start: 80, end: 130 }]);
+  });
+
+  it('handles adjacent (touching) cuts as a single contiguous cut', () => {
+    // Adjacent: first cut ends at 0.5, second starts at 0.5 — effectively one big cut
+    const result = computePartsToKeep(0, 100, [
+      { startPercent: 0.2, endPercent: 0.5 },
+      { startPercent: 0.5, endPercent: 0.8 },
+    ]);
+    // The second cut starts exactly at lastEnd (0.5), so condition cut.startPercent > lastEnd is false
+    // Keep: 0–20, 80–100
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ start: 0, end: 20 });
+    expect(result[1]).toEqual({ start: 80, end: 100 });
+  });
+
+  it('does not mutate the original cuts array', () => {
+    const cuts = [
+      { startPercent: 0.6, endPercent: 0.8 },
+      { startPercent: 0.2, endPercent: 0.4 },
+    ];
+    const original = cuts.map(c => ({ ...c }));
+    computePartsToKeep(0, 100, cuts);
+    expect(cuts).toEqual(original);
+  });
+
+  it('returns correct absolute times for a fractional segment', () => {
+    // Segment: 5.5–15.5s (10s duration), cut 50–100%
+    const result = computePartsToKeep(5.5, 15.5, [{ startPercent: 0.5, endPercent: 1 }]);
+    expect(result).toEqual([{ start: 5.5, end: 10.5 }]);
   });
 });
