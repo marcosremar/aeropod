@@ -145,6 +145,30 @@ describe("POST /api/process/[id]", () => {
     expect(data.error).toBe("Project is already being processed");
   });
 
+  it("returns 409 when project status is 'processing'", async () => {
+    vi.mocked(db.select).mockReturnValue(
+      buildSelectChain([{ ...SAMPLE_PROJECT, status: "processing" }]) as any
+    );
+
+    const res = await POST(makeRequest(), makeCtx());
+    const data = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(data.error).toBe("Project is already being processed");
+  });
+
+  it("returns 409 when project status is 'aligning'", async () => {
+    vi.mocked(db.select).mockReturnValue(
+      buildSelectChain([{ ...SAMPLE_PROJECT, status: "aligning" }]) as any
+    );
+
+    const res = await POST(makeRequest(), makeCtx());
+    const data = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(data.error).toBe("Project is already being processed");
+  });
+
   it("returns 500 when GROQ_API_KEY is not configured", async () => {
     const savedKey = process.env.GROQ_API_KEY;
     delete process.env.GROQ_API_KEY;
