@@ -509,6 +509,60 @@ describe("SemanticSearchService.search — useRerank: true", () => {
   });
 });
 
+// ─── No API key — graceful degradation ───────────────────────────────────────
+
+describe("SemanticSearchService — no API key", () => {
+  let svc: SemanticSearchService;
+  const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+  beforeEach(() => {
+    svc = new SemanticSearchService({ apiKey: "" });
+    warnSpy.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("generateEmbedding returns empty array without calling fetch", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await svc.generateEmbedding("hello");
+    expect(result).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("generateEmbedding logs a warning when apiKey is absent", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await svc.generateEmbedding("hello");
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("No API key configured"),
+    );
+  });
+
+  it("generateEmbeddings returns empty-embedding entries without calling fetch", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const results = await svc.generateEmbeddings(["a", "b"]);
+    expect(results).toEqual([
+      { text: "a", embedding: [] },
+      { text: "b", embedding: [] },
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("search returns empty array without calling fetch", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const segments: SegmentWithEmbedding[] = [
+      makeSegment("s1", "hello world"),
+    ];
+    const results = await svc.search("hello", segments);
+    expect(results).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 // ─── getSemanticSearchService singleton ──────────────────────────────────────
 
 describe("getSemanticSearchService", () => {
