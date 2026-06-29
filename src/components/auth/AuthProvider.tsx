@@ -61,10 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await fetch("/api/auth/logout", {
-      method: "POST",
-    });
-    setUser(null);
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+    } catch (error) {
+      console.error("Logout request failed:", error);
+    } finally {
+      setUser(null);
+    }
   };
 
   return (
