@@ -199,4 +199,57 @@ describe("POST /api/upload", () => {
       expect.objectContaining({ language: "pt" })
     );
   });
+
+  it("accepts audio/x-wav MIME type without rejecting it", async () => {
+    const file = makeFile("recording.wav", "audio/x-wav");
+    const req = makeRequest({ file, title: "My Episode" });
+
+    vi.mocked(db.insert).mockReturnValue(buildInsertChain([SAMPLE_PROJECT]) as any);
+
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+  });
+
+  it("passes 'es' language to the database when provided", async () => {
+    const file = makeFile("episode.mp3", "audio/mpeg");
+    const req = makeRequest({ file, title: "My Episode", language: "es" });
+
+    const insertChain = buildInsertChain([{ ...SAMPLE_PROJECT, language: "es" }]);
+    vi.mocked(db.insert).mockReturnValue(insertChain as any);
+
+    await POST(req);
+
+    expect(insertChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({ language: "es" })
+    );
+  });
+
+  it("passes targetDuration to the database when provided", async () => {
+    const file = makeFile("episode.mp3", "audio/mpeg");
+    const req = makeRequest({ file, title: "My Episode", targetDuration: "1800" });
+
+    const insertChain = buildInsertChain([{ ...SAMPLE_PROJECT, targetDuration: 1800 }]);
+    vi.mocked(db.insert).mockReturnValue(insertChain as any);
+
+    await POST(req);
+
+    expect(insertChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({ targetDuration: 1800 })
+    );
+  });
+
+  it("returns 500 when db.insert throws", async () => {
+    const file = makeFile("episode.mp3", "audio/mpeg");
+    const req = makeRequest({ file, title: "My Episode" });
+
+    vi.mocked(db.insert).mockImplementation(() => {
+      throw new Error("DB connection failed");
+    });
+
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(data.error).toBe("Failed to upload file");
+  });
 });
