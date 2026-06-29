@@ -301,5 +301,79 @@ describe("Export API", () => {
 
       expect(res.status).toBe(200);
     });
+
+    it("returns 500 when db.select throws on project lookup", async () => {
+      vi.mocked(db.select).mockImplementation(() => {
+        throw new Error("DB connection error");
+      });
+
+      const req = new NextRequest(`http://localhost/api/export/${VALID_UUID}`, {
+        method: "POST",
+      });
+      const ctx = { params: Promise.resolve({ id: VALID_UUID }) };
+
+      const res = await POST(req, ctx);
+      const data = await res.json();
+
+      expect(res.status).toBe(500);
+      expect(data.error).toMatch(/failed to export/i);
+    });
+
+    it("returns 500 when db.select throws on segment lookup", async () => {
+      vi.mocked(db.select)
+        .mockReturnValueOnce(buildSelectChain([READY_PROJECT]) as any)
+        .mockImplementationOnce(() => {
+          throw new Error("DB segments error");
+        });
+
+      const req = new NextRequest(`http://localhost/api/export/${VALID_UUID}`, {
+        method: "POST",
+      });
+      const ctx = { params: Promise.resolve({ id: VALID_UUID }) };
+
+      const res = await POST(req, ctx);
+      const data = await res.json();
+
+      expect(res.status).toBe(500);
+      expect(data.error).toMatch(/failed to export/i);
+    });
+
+    it("returns 500 when db.update throws after export generation", async () => {
+      vi.mocked(db.select)
+        .mockReturnValueOnce(buildSelectChain([READY_PROJECT]) as any)
+        .mockReturnValueOnce(buildSelectChain(SAMPLE_SEGMENTS) as any);
+
+      vi.mocked(db.update).mockImplementation(() => {
+        throw new Error("DB update error");
+      });
+
+      const req = new NextRequest(`http://localhost/api/export/${VALID_UUID}`, {
+        method: "POST",
+      });
+      const ctx = { params: Promise.resolve({ id: VALID_UUID }) };
+
+      const res = await POST(req, ctx);
+      const data = await res.json();
+
+      expect(res.status).toBe(500);
+      expect(data.error).toMatch(/failed to export/i);
+    });
+  });
+
+  describe("GET /api/export/[id] error handling", () => {
+    it("returns 500 when db.select throws", async () => {
+      vi.mocked(db.select).mockImplementation(() => {
+        throw new Error("DB connection error");
+      });
+
+      const req = new NextRequest(`http://localhost/api/export/${VALID_UUID}`);
+      const ctx = { params: Promise.resolve({ id: VALID_UUID }) };
+
+      const res = await GET(req, ctx);
+      const data = await res.json();
+
+      expect(res.status).toBe(500);
+      expect(data.error).toMatch(/failed to get export status/i);
+    });
   });
 });
